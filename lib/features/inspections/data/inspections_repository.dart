@@ -20,7 +20,7 @@ class InspectionsRepository {
   }) async {
     final q = <String, dynamic>{
       'page': page,
-      'limit': limit,
+      'pageSize': limit,
       if (assignedToMe) 'assignedToMe': true,
     };
     final s = search?.trim();
@@ -61,8 +61,7 @@ class InspectionsRepository {
       'priority': priority,
     };
     if (dueDate != null) {
-      body['dueDate'] =
-          '${dueDate.year.toString().padLeft(4, '0')}-'
+      body['dueDate'] = '${dueDate.year.toString().padLeft(4, '0')}-'
           '${dueDate.month.toString().padLeft(2, '0')}-'
           '${dueDate.day.toString().padLeft(2, '0')}';
     }
@@ -74,8 +73,7 @@ class InspectionsRepository {
   }
 
   Future<Inspection> start(String id) async {
-    final d =
-        await _api.post<Map<String, dynamic>>('/inspections/$id/start');
+    final d = await _api.post<Map<String, dynamic>>('/inspections/$id/start');
     return Inspection.fromJson(unwrap(d));
   }
 
@@ -166,8 +164,7 @@ class InspectionsRepository {
   /// The backend decides SUBMIT vs RESUBMIT from the current status, and
   /// re-validates completeness server-side immediately before accepting.
   Future<Inspection> submit(String id) async {
-    final d =
-        await _api.post<Map<String, dynamic>>('/inspections/$id/submit');
+    final d = await _api.post<Map<String, dynamic>>('/inspections/$id/submit');
     return Inspection.fromJson(unwrap(d));
   }
 }
