@@ -1,31 +1,22 @@
 import 'package:flutter/material.dart';
 
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_theme.dart';
 
-/// Constrains the app to a phone-width column when running in a desktop
-/// browser, so `flutter run -d chrome` still exercises the real mobile layout
-/// instead of stretching it (spec section 67).
-///
-/// This is intentionally NOT a separate desktop design.
+/// Constrains the app to phone width in a desktop browser so
+/// `flutter run -d chrome` still exercises the real mobile layout.
 class MobileFrame extends StatelessWidget {
   const MobileFrame({required this.child, super.key});
-
   final Widget child;
-
-  static const double _maxWidth = 480;
-  static const double _breakpoint = 600;
 
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
-    if (width <= _breakpoint) return child;
+    if (MediaQuery.sizeOf(context).width <= 600) return child;
 
     return ColoredBox(
       color: const Color(0xFFE4E8F2),
       child: Center(
         child: Container(
-          width: _maxWidth,
+          width: 460,
           margin: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
@@ -38,11 +29,7 @@ class MobileFrame extends StatelessWidget {
               ),
             ],
           ),
-          child: MediaQuery.removePadding(
-            context: context,
-            removeTop: true,
-            child: child,
-          ),
+          child: child,
         ),
       ),
     );

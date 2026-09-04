@@ -1,33 +1,31 @@
-# SCI Inspector — Flutter App (Phase 1 Foundation)
+# SCI Inspector — Flutter App
 
 Field application for the **Smart Collateral Inspection** platform.
 
 **Stack:** Flutter · Dio · Riverpod · go_router · feature-oriented architecture
+**API:** `https://sci-server.vercel.app/api/v1` (pre-configured)
 
 ---
 
-## Quick start (Chrome — no emulator required)
+## Run it in Chrome (no emulator needed)
 
 ```bash
-# 1. Generate the platform folders into this project
+unzip sci_inspector.zip && cd sci
+
+# Generate platform folders (does NOT overwrite lib/, but DOES overwrite web/index.html)
+cp web/index.html /tmp/sci_index.html
 flutter create . --project-name sci_inspector --platforms=web,android,ios
+cp /tmp/sci_index.html web/index.html
 
-# 2. Install packages
 flutter pub get
-
-# 3. Run in Chrome on a FIXED port so the backend can whitelist the origin
 flutter run -d chrome --web-port=5555 --web-hostname=localhost \
   --dart-define-from-file=dart_define.development.json
 ```
 
-> `flutter create .` will not overwrite the files in this repo — but it does
-> regenerate `web/index.html`. Restore the branded version afterwards:
-> `git checkout web/index.html`.
+### ⚠️ You must whitelist the web origin in the backend
 
-### Backend CORS
-
-Chrome debug builds are served from a fixed origin above, so add it in the
-NestJS backend:
+Browser requests are blocked by CORS before Dio ever sees them. In your NestJS
+`main.ts`:
 
 ```ts
 app.enableCors({
@@ -36,18 +34,99 @@ app.enableCors({
 });
 ```
 
-Without this, every request fails at the browser before reaching Dio.
+That is why the run command pins `--web-port=5555` instead of letting Chrome
+pick a random port. Redeploy the backend after changing this.
 
-### Splash asset
-
-Drop `sci_logo.png` into `assets/splash/`, then:
+### Verify the API is reachable first
 
 ```bash
-dart run flutter_native_splash:create
+curl -i https://sci-server.vercel.app/api/v1/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"inspector@sci.rw","password":"YOUR_PASSWORD","platform":"web"}'
 ```
 
-Until then, the in-app splash renders a vector "SCI" placeholder — the app
-still runs.
+---
+
+## What is implemented
+
+| Phase | Scope | Status |
+| --- | --- | --- |
+| 1 | Foundation: theme, router, Dio + interceptors, secure storage, auth, splash | ✅ |
+| 2 | Properties: list, search, pagination, detail, create | ✅ |
+| 3 | Inspections: list, filters, detail, create, start, status handling | ✅ |
+| 4 | Dynamic template form: fetch template, all 11 field types, autosave, version conflict | ✅ |
+| 5 | Evidence: assessments, owner, valuation, GPS, photo capture/upload/delete | ✅ |
+| 6 | Completeness & submission: gauge, outstanding items, deep-link, submit, corrections, resubmit | ✅ |
+| 7 | Offline: local drafts, mutation queue, background sync | ❌ **not built** |
+| 8 | Notifications: list, unread badge, mark read, deep-link | ✅ (push registration ❌) |
+| 9 | Production hardening: obfuscated builds, store config, integration tests | ⚠️ partial |
+
+### Phase 7 and push notifications are genuinely absent
+
+The app currently requires connectivity. There is no Drift database, no
+`PendingMutation` queue, and no sync engine. Autosave posts directly to the
+server and surfaces a failure if offline — work is **not** yet preserved
+across an app restart while disconnected. For a field app this is the most
+important remaining gap.
+
+---
+
+## Architecture
+
+```
+lib/
+├── app/          router, shell, bottom nav, mobile frame
+├── core/         config, network (Dio + interceptors), storage, theme,
+│                 location, shared widgets, validators
+└── features/
+    └── <feature>/{domain, data, application, presentation}
+```
+
+- Widgets never touch Dio: **widget → provider → repository → ApiClient**.
+- Features import `core`, and another feature's `domain` only.
+- The backend is authoritative for permissions, completeness, status
+  transitions, GPS verdicts and photo validation. Client checks are UX only.
+
+---
+
+## Key behaviours worth knowing
+
+**Token refresh is single-flight.** `AuthInterceptor` extends
+`QueuedInterceptor` and guards refresh with a `Completer`, so N concurrent
+401s trigger exactly one refresh. This matters because the backend rotates
+refresh tokens and revokes the previous one — parallel refreshes would revoke
+each other mid-inspection.
+
+**Network failure never signs you out.** Only `AUTH_TOKEN_INVALID` /
+`AUTH_SESSION_REVOKED` / a 401 on refresh clears the session. Timeouts and
+5xx are surfaced as retryable.
+
+**Optimistic concurrency is respected.** Every mutation sends `baseVersion`.
+On `INSPECTION_STALE_VERSION` the workspace shows a blocking banner with a
+*Refresh inspection* action and does **not** overwrite server data.
+
+**The form is never hard-coded.** Sections, fields, options and photo rules
+all render from the backend template, so admins can change the form without
+shipping a new app. Unknown field types render read-only instead of crashing.
+
+**No reviewer surface.** There is no approve/reject/assign UI anywhere, and a
+test asserts the inspector never holds any of the seven reviewer-only
+permissions.
+
+---
+
+## Web compatibility rules (keep these when extending)
+
+- Check `kIsWeb` **before** `Platform.isAndroid` — reversed, the web build
+  throws at runtime.
+- Never reference `dart:io` `File` in shared code. Use `EvidenceFile`
+  (`Uint8List bytes` + optional `path`).
+- Photo upload uses `MultipartFile.fromBytes` — `fromFile` does not exist on
+  web.
+- `geolocator` needs a secure context; `localhost` qualifies. Browser fixes
+  are reported as `source: "NETWORK"`.
+- Tokens are held **in memory only** on web and clear on reload. Browser mode
+  is development/QA, not production.
 
 ---
 
@@ -57,78 +136,3 @@ still runs.
 flutter analyze
 flutter test
 ```
-
----
-
-## What Phase 1 delivers
-
-| Area | Status |
-| --- | --- |
-| Feature-first project structure | ✅ |
-| Theme from brand `#2747AA` (light + dark, M3) | ✅ |
-| `go_router` + auth redirect + `mustChangePassword` guard | ✅ |
-| Floating rounded bottom nav with raised centre action | ✅ |
-| Native + in-app animated splash, HTML loader for web | ✅ |
-| Dio client with auth / retry / redacting-log interceptors | ✅ |
-| Single-flight token refresh with rotation + one retry | ✅ |
-| `ApiError` normalisation of all backend domain codes | ✅ |
-| Secure token storage (keystore native / in-memory web) | ✅ |
-| Login, forgot password, reset password, change password | ✅ |
-| Session restore via `/auth/me`, logout | ✅ |
-| Permission gate (`hasPermissionProvider`) | ✅ |
-| Design system: gauge, stat cards, alert tiles, badges | ✅ |
-| Unit tests for errors, tokens, permissions | ✅ |
-
-**Deferred by design:** properties (Phase 2), inspections (Phase 3), dynamic
-template form (Phase 4), evidence (Phase 5), completeness/submission
-(Phase 6), offline queue (Phase 7), notifications (Phase 8).
-
----
-
-## Architecture rules
-
-```
-lib/
-├── app/          # router, shell, bottom nav, mobile frame
-├── core/         # config, network, storage, theme, shared widgets, utils
-└── features/
-    └── <feature>/
-        ├── data/          # APIs + repositories (Dio lives here)
-        ├── domain/        # models + enums, no Flutter imports
-        ├── application/   # Riverpod notifiers/providers
-        └── presentation/  # screens + widgets (no Dio, no Drift)
-```
-
-- A feature may import `core`, and another feature's `domain` **only**.
-- Widgets never call Dio directly: **widget → provider → repository → Dio**.
-- The backend is authoritative for permissions, completeness, status
-  transitions, GPS verdicts and photo validation. Client-side checks are UX
-  only.
-
----
-
-## Security notes
-
-- Refresh tokens are rotated by the backend; the stored value is replaced on
-  every successful refresh and the previous token is never reused.
-- The log interceptor is `kDebugMode`-only and redacts `Authorization`,
-  passwords, tokens and `nationalId`.
-- A network failure or a 5xx **never** signs the inspector out — only a
-  genuinely invalid/revoked session does.
-- **Web builds are development/QA only.** Browser storage is not a hardware
-  keystore, so tokens are held in memory and cleared on reload. The login
-  screen displays a notice when running this way.
-
----
-
-## Web compatibility rules (keep these when extending)
-
-- Check `kIsWeb` **before** touching `Platform` — otherwise the web build
-  throws at runtime.
-- Never reference `dart:io` `File` in shared code; use an `EvidenceFile`
-  abstraction (`Uint8List bytes` + optional `path`).
-- Photo uploads must branch: `MultipartFile.fromBytes` on web,
-  `MultipartFile.fromFile` on mobile.
-- `geolocator` needs a secure context; `localhost` qualifies, so
-  `flutter run -d chrome` works. Map browser fixes to `source: "NETWORK"`.
-- Skip `firebase_messaging` registration on web unless configured.

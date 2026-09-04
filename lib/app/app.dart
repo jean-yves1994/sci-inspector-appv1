@@ -10,21 +10,17 @@ class SciInspectorApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final router = ref.watch(routerProvider);
-
     return MaterialApp.router(
       title: 'SCI Inspector',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
-      themeMode: ThemeMode.system,
-      routerConfig: router,
+      themeMode: ThemeMode.light,
+      routerConfig: ref.watch(routerProvider),
       builder: (context, child) {
-        // Respect the user's text scale (accessibility), but guard against
-        // extreme values breaking dense field forms.
+        // Respect user text scaling, but guard dense field forms.
         final scaler = MediaQuery.textScalerOf(context)
-            .clamp(minScaleFactor: 0.9, maxScaleFactor: 1.6);
-
+            .clamp(minScaleFactor: 0.9, maxScaleFactor: 1.5);
         return MediaQuery(
           data: MediaQuery.of(context).copyWith(textScaler: scaler),
           child: MobileFrame(child: child ?? const SizedBox.shrink()),

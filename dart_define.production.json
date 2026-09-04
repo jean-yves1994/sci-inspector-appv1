@@ -1,4 +1,4 @@
 {
-  "SCI_API_URL": "https://REPLACE-WITH-YOUR-SCI-BACKEND/api/v1",
+  "SCI_API_URL": "https://sci-server.vercel.app/api/v1",
   "SCI_ENV": "production"
 }

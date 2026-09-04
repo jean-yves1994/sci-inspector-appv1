@@ -3,29 +3,24 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/auth/application/session_controller.dart';
-import '../../features/auth/presentation/change_password_screen.dart';
-import '../../features/auth/presentation/forgot_password_screen.dart';
-import '../../features/auth/presentation/login_screen.dart';
-import '../../features/auth/presentation/reset_password_screen.dart';
-import '../../features/home/presentation/home_screen.dart';
-import '../../features/inspections/presentation/inspection_list_screen.dart';
-import '../../features/notifications/presentation/notifications_screen.dart';
-import '../../features/profile/presentation/profile_screen.dart';
-import '../../features/properties/presentation/property_list_screen.dart';
-import '../../features/splash/presentation/splash_screen.dart';
+import '../../features/auth/presentation/auth_screens.dart';
+import '../../features/home/home_screen.dart';
+import '../../features/inspections/presentation/inspection_screens.dart';
+import '../../features/inspections/presentation/workspace/inspection_workspace_screen.dart';
+import '../../features/notifications/notifications.dart';
+import '../../features/profile/profile_screen.dart';
+import '../../features/properties/presentation/property_screens.dart';
+import '../../features/splash/splash_screen.dart';
 import '../shell/app_shell.dart';
 import 'routes.dart';
 
 final _rootKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 final _shellKey = GlobalKey<NavigatorState>(debugLabel: 'shell');
 
-/// Bridges Riverpod state changes into go_router's refresh mechanism.
 class _RouterRefresh extends ChangeNotifier {
   _RouterRefresh(Ref ref) {
     ref.listen<SessionState>(
-      sessionControllerProvider,
-      (_, __) => notifyListeners(),
-    );
+        sessionControllerProvider, (_, __) => notifyListeners());
   }
 }
 
@@ -39,68 +34,83 @@ final routerProvider = Provider<GoRouter>((ref) {
     refreshListenable: refresh,
     redirect: (context, state) {
       final session = ref.read(sessionControllerProvider);
-      final location = state.matchedLocation;
+      final loc = state.matchedLocation;
 
-      // Bootstrap has not finished — stay on the splash screen.
       if (session is SessionUnknown) {
-        return location == Routes.splash ? null : Routes.splash;
+        return loc == Routes.splash ? null : Routes.splash;
       }
 
-      final isUnauthRoute = Routes.unauthenticated.contains(location);
+      final isAuthRoute = Routes.unauthenticated.contains(loc);
 
       if (session is SessionUnauthenticated) {
-        return isUnauthRoute ? null : Routes.login;
+        return isAuthRoute ? null : Routes.login;
       }
 
       if (session is SessionAuthenticated) {
-        // Force the change-password flow before any normal app usage.
-        if (session.mustChangePassword &&
-            location != Routes.changePassword) {
+        // Force the password change before any normal app usage.
+        if (session.mustChangePassword && loc != Routes.changePassword) {
           return Routes.changePassword;
         }
-        if (isUnauthRoute || location == Routes.splash) {
-          return Routes.home;
-        }
+        if (isAuthRoute || loc == Routes.splash) return Routes.home;
       }
-
       return null;
     },
     routes: <RouteBase>[
-      GoRoute(
-        path: Routes.splash,
-        builder: (_, __) => const SplashScreen(),
-      ),
-      GoRoute(
-        path: Routes.login,
-        builder: (_, __) => const LoginScreen(),
-      ),
+      GoRoute(path: Routes.splash, builder: (_, __) => const SplashScreen()),
+      GoRoute(path: Routes.login, builder: (_, __) => const LoginScreen()),
       GoRoute(
         path: Routes.forgotPassword,
         builder: (_, __) => const ForgotPasswordScreen(),
       ),
       GoRoute(
         path: Routes.resetPassword,
-        builder: (context, state) => ResetPasswordScreen(
-          token: state.uri.queryParameters['token'],
-        ),
+        builder: (c, s) =>
+            ResetPasswordScreen(token: s.uri.queryParameters['token']),
       ),
       GoRoute(
         path: Routes.changePassword,
         builder: (_, __) => const ChangePasswordScreen(),
       ),
 
-      // Authenticated shell: each tab keeps its own navigation stack.
+      // Full-screen routes outside the shell so they cover the bottom nav.
+      GoRoute(
+        path: Routes.propertyNew,
+        parentNavigatorKey: _rootKey,
+        builder: (_, __) => const CreatePropertyScreen(),
+      ),
+      GoRoute(
+        path: Routes.propertyDetailPattern,
+        parentNavigatorKey: _rootKey,
+        builder: (c, s) =>
+            PropertyDetailScreen(propertyId: s.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: Routes.inspectionNewPattern,
+        parentNavigatorKey: _rootKey,
+        builder: (c, s) => CreateInspectionScreen(
+            propertyId: s.pathParameters['propertyId']!),
+      ),
+      GoRoute(
+        path: Routes.inspectionWorkspacePattern,
+        parentNavigatorKey: _rootKey,
+        builder: (c, s) => InspectionWorkspaceScreen(
+          inspectionId: s.pathParameters['id']!,
+          initialSection: s.uri.queryParameters['section'],
+        ),
+      ),
+      GoRoute(
+        path: Routes.inspectionDetailPattern,
+        parentNavigatorKey: _rootKey,
+        builder: (c, s) =>
+            InspectionDetailScreen(inspectionId: s.pathParameters['id']!),
+      ),
+
       ShellRoute(
         navigatorKey: _shellKey,
-        builder: (context, state, child) => AppShell(
-          location: state.matchedLocation,
-          child: child,
-        ),
+        builder: (c, s, child) =>
+            AppShell(location: s.matchedLocation, child: child),
         routes: <RouteBase>[
-          GoRoute(
-            path: Routes.home,
-            builder: (_, __) => const HomeScreen(),
-          ),
+          GoRoute(path: Routes.home, builder: (_, __) => const HomeScreen()),
           GoRoute(
             path: Routes.inspections,
             builder: (_, __) => const InspectionListScreen(),

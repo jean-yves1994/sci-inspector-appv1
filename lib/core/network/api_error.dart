@@ -1,9 +1,7 @@
 import 'package:dio/dio.dart';
 
-/// Backend domain error codes (spec section 63).
 class ApiErrorCode {
   const ApiErrorCode._();
-
   static const String authInvalidCredentials = 'AUTH_INVALID_CREDENTIALS';
   static const String authTokenInvalid = 'AUTH_TOKEN_INVALID';
   static const String authSessionRevoked = 'AUTH_SESSION_REVOKED';
@@ -18,8 +16,6 @@ class ApiErrorCode {
   static const String conflict = 'CONFLICT';
   static const String notFound = 'NOT_FOUND';
   static const String badRequest = 'BAD_REQUEST';
-
-  // Client-side codes.
   static const String network = 'NETWORK_UNAVAILABLE';
   static const String timeout = 'NETWORK_TIMEOUT';
   static const String server = 'SERVER_ERROR';
@@ -27,7 +23,6 @@ class ApiErrorCode {
   static const String unknown = 'UNKNOWN_ERROR';
 }
 
-/// Normalised client-facing error. Raw stack traces are never surfaced.
 class ApiError implements Exception {
   const ApiError({
     required this.code,
@@ -41,8 +36,7 @@ class ApiError implements Exception {
   final Map<String, dynamic>? details;
   final int? status;
 
-  /// True when the session is genuinely invalid and we must sign the user out.
-  /// An ordinary network failure must NEVER log the user out (spec section 61).
+  /// Only these mean the session is genuinely dead. A timeout never is.
   bool get isSessionInvalid =>
       code == ApiErrorCode.authTokenInvalid ||
       code == ApiErrorCode.authSessionRevoked;
@@ -51,36 +45,30 @@ class ApiError implements Exception {
       code == ApiErrorCode.network || code == ApiErrorCode.timeout;
 
   bool get isStaleVersion => code == ApiErrorCode.inspectionStaleVersion;
+  bool get isIncomplete => code == ApiErrorCode.inspectionIncomplete;
 
-  /// Maps a [DioException] into a normalised [ApiError].
   factory ApiError.fromDio(DioException e) {
     switch (e.type) {
       case DioExceptionType.connectionTimeout:
       case DioExceptionType.sendTimeout:
       case DioExceptionType.receiveTimeout:
-      case DioExceptionType.transformTimeout:
         return const ApiError(
           code: ApiErrorCode.timeout,
-          message:
-              'The connection timed out. Your work is saved locally and will '
-              'sync when the network is available.',
+          message: 'The connection timed out. Your work is saved on this '
+              'device and will sync when the network returns.',
         );
       case DioExceptionType.connectionError:
         return const ApiError(
           code: ApiErrorCode.network,
-          message:
-              'No connection to the SCI server. You can keep working offline.',
+          message: 'No connection to the SCI server. You can keep working.',
         );
       case DioExceptionType.cancel:
         return const ApiError(
-          code: ApiErrorCode.cancelled,
-          message: 'Request cancelled.',
-        );
+            code: ApiErrorCode.cancelled, message: 'Request cancelled.');
       case DioExceptionType.badCertificate:
         return const ApiError(
-          code: ApiErrorCode.network,
-          message: 'The server certificate could not be verified.',
-        );
+            code: ApiErrorCode.network,
+            message: 'The server certificate could not be verified.');
       case DioExceptionType.badResponse:
       case DioExceptionType.unknown:
         return ApiError._fromResponse(e);
@@ -91,78 +79,54 @@ class ApiError implements Exception {
     final response = e.response;
     final status = response?.statusCode;
     final data = response?.data;
-
     String? code;
     String? message;
     Map<String, dynamic>? details;
 
     if (data is Map<String, dynamic>) {
       code = data['code'] as String? ?? data['error'] as String?;
-      final rawMessage = data['message'];
-      if (rawMessage is String) {
-        message = rawMessage;
-      } else if (rawMessage is List && rawMessage.isNotEmpty) {
-        // NestJS class-validator returns message as a string array.
-        message = rawMessage.map((dynamic m) => m.toString()).join('\n');
+      final raw = data['message'];
+      if (raw is String) {
+        message = raw;
+      } else if (raw is List && raw.isNotEmpty) {
+        // NestJS class-validator returns string[].
+        message = raw.map((dynamic m) => m.toString()).join('\n');
       }
-      final rawDetails = data['details'];
-      if (rawDetails is Map<String, dynamic>) details = rawDetails;
+      if (data['details'] is Map<String, dynamic>) {
+        details = data['details'] as Map<String, dynamic>;
+      }
     }
 
-    code ??= _codeForStatus(status);
-    message ??= _messageForStatus(status);
-
     return ApiError(
-      code: code,
-      message: message,
+      code: code ?? _codeForStatus(status),
+      message: message ?? _messageForStatus(status),
       details: details,
       status: status,
     );
   }
 
-  static String _codeForStatus(int? status) {
-    switch (status) {
-      case 400:
-        return ApiErrorCode.badRequest;
-      case 401:
-        return ApiErrorCode.authTokenInvalid;
-      case 403:
-        return ApiErrorCode.authForbidden;
-      case 404:
-        return ApiErrorCode.notFound;
-      case 409:
-        return ApiErrorCode.conflict;
-      case 500:
-      case 502:
-      case 503:
-      case 504:
-        return ApiErrorCode.server;
-      default:
-        return ApiErrorCode.unknown;
-    }
-  }
+  static String _codeForStatus(int? s) => switch (s) {
+        400 => ApiErrorCode.badRequest,
+        401 => ApiErrorCode.authTokenInvalid,
+        403 => ApiErrorCode.authForbidden,
+        404 => ApiErrorCode.notFound,
+        409 => ApiErrorCode.conflict,
+        413 => ApiErrorCode.photoTooLarge,
+        500 || 502 || 503 || 504 => ApiErrorCode.server,
+        _ => ApiErrorCode.unknown,
+      };
 
-  static String _messageForStatus(int? status) {
-    switch (status) {
-      case 400:
-        return 'The information sent was not accepted by the server.';
-      case 401:
-        return 'Your session has expired. Please sign in again.';
-      case 403:
-        return 'You do not have permission to perform this action.';
-      case 404:
-        return 'The requested item could not be found.';
-      case 409:
-        return 'This item was changed elsewhere. Refresh and try again.';
-      case 500:
-      case 502:
-      case 503:
-      case 504:
-        return 'The SCI server is temporarily unavailable. Please try again.';
-      default:
-        return 'Something went wrong. Please try again.';
-    }
-  }
+  static String _messageForStatus(int? s) => switch (s) {
+        400 => 'The information sent was not accepted by the server.',
+        401 => 'Your session has expired. Please sign in again.',
+        403 => 'You do not have permission to perform this action.',
+        404 => 'The requested item could not be found.',
+        409 => 'This item was changed elsewhere. Refresh and try again.',
+        413 => 'That file is too large to upload.',
+        500 || 502 || 503 || 504 =>
+          'The SCI server is temporarily unavailable. Please try again.',
+        _ => 'Something went wrong. Please try again.',
+      };
 
   @override
   String toString() => 'ApiError($code, $status): $message';

@@ -5,35 +5,27 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app/app.dart';
-import 'features/splash/application/bootstrap_provider.dart';
+import 'features/splash/splash_screen.dart';
 
 void main() {
-  runZonedGuarded<void>(
-    () {
-      WidgetsFlutterBinding.ensureInitialized();
+  WidgetsFlutterBinding.ensureInitialized();
 
-      // Redacting global error reporters. Never log tokens or credentials.
-      FlutterError.onError = (details) {
-        FlutterError.presentError(details);
-        if (kDebugMode) debugPrint('SCI uncaught: ${details.exceptionAsString()}');
-      };
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    if (kDebugMode) {
+      debugPrint('SCI uncaught: ${details.exceptionAsString()}');
+    }
+  };
 
-      final container = ProviderContainer();
+  final container = ProviderContainer();
 
-      // Kick off bootstrap immediately; the splash screen watches its state.
-      unawaited(
-        container.read(bootstrapProvider.future).catchError((Object _) {}),
-      );
+  // Start bootstrap immediately; the splash screen watches its state.
+  unawaited(container.read(bootstrapProvider.future).catchError((Object _) {}));
 
-      runApp(
-        UncontrolledProviderScope(
-          container: container,
-          child: const SciInspectorApp(),
-        ),
-      );
-    },
-    (error, stack) {
-      if (kDebugMode) debugPrint('SCI zone error: $error');
-    },
+  runApp(
+    UncontrolledProviderScope(
+      container: container,
+      child: const SciInspectorApp(),
+    ),
   );
 }

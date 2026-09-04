@@ -1,4 +1,3 @@
-/// Central route path constants. No raw strings in widgets.
 class Routes {
   const Routes._();
 
@@ -14,10 +13,24 @@ class Routes {
   static const String notifications = '/notifications';
   static const String profile = '/profile';
 
-  /// Routes reachable without an authenticated session.
+  // '/properties/new' MUST be declared before '/properties/:id', otherwise
+  // go_router parses "new" as a property id.
+  static const String propertyNew = '/properties/new';
+  static const String propertyDetailPattern = '/properties/:id';
+  static String propertyDetail(String id) => '/properties/$id';
+
+  static const String inspectionNewPattern = '/inspections/new/:propertyId';
+  static const String inspectionDetailPattern = '/inspections/:id';
+  static const String inspectionWorkspacePattern =
+      '/inspections/:id/workspace';
+
+  static String inspectionNewFor(String propertyId) =>
+      '/inspections/new/$propertyId';
+  static String inspectionDetail(String id) => '/inspections/$id';
+  static String inspectionWorkspace(String id, {String? section}) =>
+      '/inspections/$id/workspace${section == null ? '' : '?section=$section'}';
+
   static const Set<String> unauthenticated = <String>{
-    login,
-    forgotPassword,
-    resetPassword,
+    login, forgotPassword, resetPassword,
   };
 }

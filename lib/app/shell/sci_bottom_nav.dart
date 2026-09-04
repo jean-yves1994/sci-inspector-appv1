@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_theme.dart';
 
 class SciNavItem {
   const SciNavItem({
@@ -17,12 +16,8 @@ class SciNavItem {
   final String route;
 }
 
-/// Floating, rounded, detached bottom navigation bar with an animated pill
-/// indicator behind the active tab — matching the cybersecurity UI reference
-/// (spec section 65).
-///
-/// Built as a custom widget rather than a stock BottomNavigationBar because
-/// the reference bar is inset from the screen edges and elevated.
+/// Floating, rounded, detached bottom bar with an animated pill indicator and
+/// a raised centre action — matching the cybersecurity UI reference.
 class SciBottomNav extends StatelessWidget {
   const SciBottomNav({
     required this.items,
@@ -47,11 +42,7 @@ class SciBottomNav extends StatelessWidget {
       top: false,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(
-          AppSpacing.md,
-          0,
-          AppSpacing.md,
-          AppSpacing.sm,
-        ),
+            AppSpacing.md, 0, AppSpacing.md, AppSpacing.sm),
         child: Stack(
           clipBehavior: Clip.none,
           alignment: Alignment.topCenter,
@@ -77,9 +68,7 @@ class SciBottomNav extends StatelessWidget {
               child: Row(
                 children: <Widget>[
                   for (var i = 0; i < items.length; i++) ...<Widget>[
-                    // Reserve the centre slot for the raised primary action.
-                    if (i == items.length ~/ 2)
-                      const SizedBox(width: 64),
+                    if (i == items.length ~/ 2) const SizedBox(width: 60),
                     Expanded(
                       child: _NavButton(
                         item: items[i],
@@ -94,8 +83,6 @@ class SciBottomNav extends StatelessWidget {
                 ],
               ),
             ),
-
-            // Raised centre primary action (New Property / New Inspection).
             Positioned(
               top: -18,
               child: Semantics(
@@ -124,11 +111,8 @@ class SciBottomNav extends StatelessWidget {
                         ),
                       ],
                     ),
-                    child: const Icon(
-                      Icons.add_rounded,
-                      color: Colors.white,
-                      size: 30,
-                    ),
+                    child: const Icon(Icons.add_rounded,
+                        color: Colors.white, size: 30),
                   ),
                 ),
               ),
@@ -156,8 +140,9 @@ class _NavButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final inactive =
-        isDark ? Colors.white.withValues(alpha: 0.55) : AppColors.textSecondary;
+    final inactive = isDark
+        ? Colors.white.withValues(alpha: 0.55)
+        : AppColors.textSecondary;
 
     return Semantics(
       button: true,
@@ -172,13 +157,11 @@ class _NavButton extends StatelessWidget {
             duration: const Duration(milliseconds: 220),
             curve: Curves.easeOutCubic,
             margin: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.xxs,
-              vertical: AppSpacing.xs,
-            ),
+                horizontal: 2, vertical: AppSpacing.xs),
             decoration: BoxDecoration(
-              // Animated pill behind the active item.
               color: selected
-                  ? AppColors.primary.withValues(alpha: isDark ? 0.22 : 0.10)
+                  ? AppColors.primary
+                      .withValues(alpha: isDark ? 0.22 : 0.10)
                   : Colors.transparent,
               borderRadius: BorderRadius.circular(AppRadius.md),
             ),
@@ -191,16 +174,18 @@ class _NavButton extends StatelessWidget {
                   backgroundColor: AppColors.danger,
                   child: Icon(
                     selected ? item.activeIcon : item.icon,
-                    size: 21,
+                    size: 20,
                     color: selected ? AppColors.primary : inactive,
                   ),
                 ),
                 const SizedBox(height: 2),
-                // Icons plus text, never icons alone (accessibility).
+                // Icons plus text, never icons alone.
                 Text(
                   item.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 10.5,
+                    fontSize: 9.5,
                     height: 1.1,
                     fontWeight:
                         selected ? FontWeight.w700 : FontWeight.w500,
