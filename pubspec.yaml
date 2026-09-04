@@ -1,0 +1,61 @@
+name: sci_inspector
+description: Smart Collateral Inspection (SCI) - Inspector field application.
+publish_to: "none"
+version: 0.1.0+1
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State management
+  flutter_riverpod: ^2.5.1
+
+  # Networking
+  dio: ^5.4.3+1
+
+  # Routing
+  go_router: ^14.2.0
+
+  # Secure storage / prefs
+  flutter_secure_storage: ^9.2.2
+  shared_preferences: ^2.2.3
+
+  # Connectivity
+  connectivity_plus: ^6.0.3
+
+  # Utils
+  uuid: ^4.4.0
+  intl: ^0.19.0
+
+  # Splash
+  flutter_native_splash: ^2.4.0
+
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+  mocktail: ^1.0.4
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/splash/
+
+# ---------------------------------------------------------------------------
+# Native splash screen (Section 66 of the specification)
+# Run: dart run flutter_native_splash:create
+# ---------------------------------------------------------------------------
+flutter_native_splash:
+  color: "#2747AA"
+  color_dark: "#0E1116"
+  image: assets/splash/sci_logo.png
+  android_12:
+    image: assets/splash/sci_logo.png
+    icon_background_color: "#2747AA"
+  web: true
+  fullscreen: true
