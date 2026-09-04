@@ -17,7 +17,7 @@ class PropertiesRepository {
     int limit = 20,
     CancelToken? cancelToken,
   }) async {
-    final q = <String, dynamic>{'page': page, 'limit': limit};
+    final q = <String, dynamic>{'page': page, 'pageSize': limit};
     final s = search?.trim();
     if (s != null && s.isNotEmpty) q['search'] = s;
 
@@ -32,8 +32,8 @@ class PropertiesRepository {
   }
 
   Future<Property> create(CreatePropertyRequest r) async {
-    final d = await _api.post<Map<String, dynamic>>('/properties',
-        body: r.toJson());
+    final d =
+        await _api.post<Map<String, dynamic>>('/properties', body: r.toJson());
     return Property.fromJson(unwrap(d));
   }
 }
