@@ -47,6 +47,8 @@ class ApiError implements Exception {
   bool get isStaleVersion => code == ApiErrorCode.inspectionStaleVersion;
   bool get isIncomplete => code == ApiErrorCode.inspectionIncomplete;
 
+  /// Uses a non-exhaustive `switch` statement with a `default`, so a future
+  /// Dio release adding another DioExceptionType cannot break the build.
   factory ApiError.fromDio(DioException e) {
     switch (e.type) {
       case DioExceptionType.connectionTimeout:
@@ -57,20 +59,31 @@ class ApiError implements Exception {
           message: 'The connection timed out. Your work is saved on this '
               'device and will sync when the network returns.',
         );
+
       case DioExceptionType.connectionError:
         return const ApiError(
           code: ApiErrorCode.network,
           message: 'No connection to the SCI server. You can keep working.',
         );
+
       case DioExceptionType.cancel:
         return const ApiError(
-            code: ApiErrorCode.cancelled, message: 'Request cancelled.');
+          code: ApiErrorCode.cancelled,
+          message: 'Request cancelled.',
+        );
+
       case DioExceptionType.badCertificate:
         return const ApiError(
-            code: ApiErrorCode.network,
-            message: 'The server certificate could not be verified.');
+          code: ApiErrorCode.network,
+          message: 'The server certificate could not be verified.',
+        );
+
       case DioExceptionType.badResponse:
-      case DioExceptionType.unknown:
+        return ApiError._fromResponse(e);
+
+      // Covers DioExceptionType.unknown, transformTimeout (dio 5.11+), and
+      // any type added by a future Dio version.
+      default:
         return ApiError._fromResponse(e);
     }
   }
@@ -105,28 +118,53 @@ class ApiError implements Exception {
     );
   }
 
-  static String _codeForStatus(int? s) => switch (s) {
-        400 => ApiErrorCode.badRequest,
-        401 => ApiErrorCode.authTokenInvalid,
-        403 => ApiErrorCode.authForbidden,
-        404 => ApiErrorCode.notFound,
-        409 => ApiErrorCode.conflict,
-        413 => ApiErrorCode.photoTooLarge,
-        500 || 502 || 503 || 504 => ApiErrorCode.server,
-        _ => ApiErrorCode.unknown,
-      };
+  static String _codeForStatus(int? s) {
+    switch (s) {
+      case 400:
+        return ApiErrorCode.badRequest;
+      case 401:
+        return ApiErrorCode.authTokenInvalid;
+      case 403:
+        return ApiErrorCode.authForbidden;
+      case 404:
+        return ApiErrorCode.notFound;
+      case 409:
+        return ApiErrorCode.conflict;
+      case 413:
+        return ApiErrorCode.photoTooLarge;
+      case 500:
+      case 502:
+      case 503:
+      case 504:
+        return ApiErrorCode.server;
+      default:
+        return ApiErrorCode.unknown;
+    }
+  }
 
-  static String _messageForStatus(int? s) => switch (s) {
-        400 => 'The information sent was not accepted by the server.',
-        401 => 'Your session has expired. Please sign in again.',
-        403 => 'You do not have permission to perform this action.',
-        404 => 'The requested item could not be found.',
-        409 => 'This item was changed elsewhere. Refresh and try again.',
-        413 => 'That file is too large to upload.',
-        500 || 502 || 503 || 504 =>
-          'The SCI server is temporarily unavailable. Please try again.',
-        _ => 'Something went wrong. Please try again.',
-      };
+  static String _messageForStatus(int? s) {
+    switch (s) {
+      case 400:
+        return 'The information sent was not accepted by the server.';
+      case 401:
+        return 'Your session has expired. Please sign in again.';
+      case 403:
+        return 'You do not have permission to perform this action.';
+      case 404:
+        return 'The requested item could not be found.';
+      case 409:
+        return 'This item was changed elsewhere. Refresh and try again.';
+      case 413:
+        return 'That file is too large to upload.';
+      case 500:
+      case 502:
+      case 503:
+      case 504:
+        return 'The SCI server is temporarily unavailable. Please try again.';
+      default:
+        return 'Something went wrong. Please try again.';
+    }
+  }
 
   @override
   String toString() => 'ApiError($code, $status): $message';

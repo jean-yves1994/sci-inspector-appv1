@@ -1,31 +1,102 @@
-# SCI Inspector — Flutter App
+# The last 2 issues
 
-Field application for the **Smart Collateral Inspection** platform.
+Down from 15 to 2. Both are files the previous script **kept on purpose**
+because something still imported them — it refuses to delete a referenced file
+rather than break your build.
 
-**Stack:** Flutter · Dio · Riverpod · go_router · feature-oriented architecture
-**API:** `https://sci-server.vercel.app/api/v1` (pre-configured)
+```powershell
+powershell -ExecutionPolicy Bypass -File finish.ps1
+flutter analyze
+```
+
+The script also prints a report of every remaining Phase-1 duplicate it can
+find, so you'll see whether anything else is still doubled up.
 
 ---
 
-## Run it in Chrome (no emulator needed)
+## Or fix both by hand — two edits
 
-```bash
-unzip sci_inspector.zip && cd sci
+### 1. `ambiguous_import` — ProgressGauge defined twice
 
-# Generate platform folders (does NOT overwrite lib/, but DOES overwrite web/index.html)
-cp web/index.html /tmp/sci_index.html
-flutter create . --project-name sci_inspector --platforms=web,android,ios
-cp /tmp/sci_index.html web/index.html
+Open `lib\features\home\presentation\home_screen.dart` and **delete** this
+import line:
 
-flutter pub get
-flutter run -d chrome --web-port=5555 --web-hostname=localhost \
-  --dart-define-from-file=dart_define.development.json
+```dart
+import '../../../core/widgets/progress_gauge.dart';
 ```
 
-### ⚠️ You must whitelist the web origin in the backend
+`sci_widgets.dart` already exports `ProgressGauge`, so the screen keeps
+working. Then delete the orphaned file:
 
-Browser requests are blocked by CORS before Dio ever sees them. In your NestJS
-`main.ts`:
+```powershell
+Remove-Item lib\core\widgets\progress_gauge.dart
+```
+
+> **Worth checking:** the path `features\home\presentation\home_screen.dart` is
+> the *Phase 1* home screen. The full build puts it at
+> `features\home\home_screen.dart`. If both exist, look at
+> `lib\app\router\app_router.dart` to see which one it imports and delete the
+> other — otherwise you're maintaining two dashboards, and only one is on
+> screen. The script does this check automatically.
+
+### 2. `avoid_renaming_method_parameters`
+
+Open `lib\core\network\interceptors\redacting_log_interceptor.dart`, line 38:
+
+```dart
+void onResponse(Response<dynamic> response, ResponseInterceptorHandler h) {
+```
+
+Change to:
+
+```dart
+void onResponse(
+  Response<dynamic> response,
+  ResponseInterceptorHandler handler,
+) {
+```
+
+…and update the body, which calls `h.next(response);` → `handler.next(response);`
+
+**Better option if nothing imports it:** the whole `interceptors\` folder was
+merged into `lib\core\network\interceptors.dart`. Check first:
+
+```powershell
+Select-String -Path lib\*.dart,lib\**\*.dart -Pattern "redacting_log_interceptor"
+```
+
+If that returns nothing outside the file itself, just delete the folder:
+
+```powershell
+Remove-Item lib\core\network\interceptors\ -Recurse
+```
+
+---
+
+## Why these two survived the last pass
+
+`Remove-Stale` scans for inbound imports before deleting. Both files had a
+referrer — `progress_gauge.dart` from the Phase-1 home screen,
+`redacting_log_interceptor.dart` from whatever still imports the split
+interceptor files (most likely `dio_provider.dart`). That guard is deliberate:
+deleting a referenced file turns two lint warnings into a broken build.
+
+`finish.ps1` breaks the cycle by removing the *import* first, then deleting the
+now-orphaned file.
+
+---
+
+## After this
+
+`flutter analyze` → **No issues found.**
+
+Then run it:
+
+```powershell
+flutter run -d chrome --web-port=5555 --web-hostname=localhost --dart-define-from-file=dart_define.development.json
+```
+
+Login will fail on CORS until your NestJS `main.ts` has:
 
 ```ts
 app.enableCors({
@@ -34,105 +105,5 @@ app.enableCors({
 });
 ```
 
-That is why the run command pins `--web-port=5555` instead of letting Chrome
-pick a random port. Redeploy the backend after changing this.
-
-### Verify the API is reachable first
-
-```bash
-curl -i https://sci-server.vercel.app/api/v1/auth/login \
-  -H 'Content-Type: application/json' \
-  -d '{"email":"inspector@sci.rw","password":"YOUR_PASSWORD","platform":"web"}'
-```
-
----
-
-## What is implemented
-
-| Phase | Scope | Status |
-| --- | --- | --- |
-| 1 | Foundation: theme, router, Dio + interceptors, secure storage, auth, splash | ✅ |
-| 2 | Properties: list, search, pagination, detail, create | ✅ |
-| 3 | Inspections: list, filters, detail, create, start, status handling | ✅ |
-| 4 | Dynamic template form: fetch template, all 11 field types, autosave, version conflict | ✅ |
-| 5 | Evidence: assessments, owner, valuation, GPS, photo capture/upload/delete | ✅ |
-| 6 | Completeness & submission: gauge, outstanding items, deep-link, submit, corrections, resubmit | ✅ |
-| 7 | Offline: local drafts, mutation queue, background sync | ❌ **not built** |
-| 8 | Notifications: list, unread badge, mark read, deep-link | ✅ (push registration ❌) |
-| 9 | Production hardening: obfuscated builds, store config, integration tests | ⚠️ partial |
-
-### Phase 7 and push notifications are genuinely absent
-
-The app currently requires connectivity. There is no Drift database, no
-`PendingMutation` queue, and no sync engine. Autosave posts directly to the
-server and surfaces a failure if offline — work is **not** yet preserved
-across an app restart while disconnected. For a field app this is the most
-important remaining gap.
-
----
-
-## Architecture
-
-```
-lib/
-├── app/          router, shell, bottom nav, mobile frame
-├── core/         config, network (Dio + interceptors), storage, theme,
-│                 location, shared widgets, validators
-└── features/
-    └── <feature>/{domain, data, application, presentation}
-```
-
-- Widgets never touch Dio: **widget → provider → repository → ApiClient**.
-- Features import `core`, and another feature's `domain` only.
-- The backend is authoritative for permissions, completeness, status
-  transitions, GPS verdicts and photo validation. Client checks are UX only.
-
----
-
-## Key behaviours worth knowing
-
-**Token refresh is single-flight.** `AuthInterceptor` extends
-`QueuedInterceptor` and guards refresh with a `Completer`, so N concurrent
-401s trigger exactly one refresh. This matters because the backend rotates
-refresh tokens and revokes the previous one — parallel refreshes would revoke
-each other mid-inspection.
-
-**Network failure never signs you out.** Only `AUTH_TOKEN_INVALID` /
-`AUTH_SESSION_REVOKED` / a 401 on refresh clears the session. Timeouts and
-5xx are surfaced as retryable.
-
-**Optimistic concurrency is respected.** Every mutation sends `baseVersion`.
-On `INSPECTION_STALE_VERSION` the workspace shows a blocking banner with a
-*Refresh inspection* action and does **not** overwrite server data.
-
-**The form is never hard-coded.** Sections, fields, options and photo rules
-all render from the backend template, so admins can change the form without
-shipping a new app. Unknown field types render read-only instead of crashing.
-
-**No reviewer surface.** There is no approve/reject/assign UI anywhere, and a
-test asserts the inspector never holds any of the seven reviewer-only
-permissions.
-
----
-
-## Web compatibility rules (keep these when extending)
-
-- Check `kIsWeb` **before** `Platform.isAndroid` — reversed, the web build
-  throws at runtime.
-- Never reference `dart:io` `File` in shared code. Use `EvidenceFile`
-  (`Uint8List bytes` + optional `path`).
-- Photo upload uses `MultipartFile.fromBytes` — `fromFile` does not exist on
-  web.
-- `geolocator` needs a secure context; `localhost` qualifies. Browser fixes
-  are reported as `source: "NETWORK"`.
-- Tokens are held **in memory only** on web and clear on reload. Browser mode
-  is development/QA, not production.
-
----
-
-## Verify
-
-```bash
-flutter analyze
-flutter test
-```
+Redeploy after adding it. If login then returns 401 rather than a network
+error, that's progress — it means the request reached your server.

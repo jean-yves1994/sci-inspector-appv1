@@ -107,7 +107,7 @@ void main() {
       for (final s in InspectionStatus.values) {
         final editable = s == InspectionStatus.inProgress ||
             s == InspectionStatus.correctionRequested;
-        expect(s.isEditable, editable, reason: '${s.wire}');
+        expect(s.isEditable, editable, reason: s.wire);
       }
     });
 

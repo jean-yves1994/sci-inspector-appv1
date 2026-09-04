@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
-import '../../../core/widgets/progress_gauge.dart';
 import '../../../core/widgets/sci_widgets.dart';
 import '../../auth/application/session_controller.dart';
 

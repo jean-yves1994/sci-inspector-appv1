@@ -12,6 +12,7 @@ import '../../auth/application/session_controller.dart';
 import '../../auth/domain/user.dart';
 import '../../inspections/domain/inspection_status.dart';
 import '../application/property_providers.dart';
+import '../data/properties_repository.dart';
 import '../domain/property.dart';
 
 // --------------------------------------------------------------- list

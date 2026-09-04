@@ -7,10 +7,10 @@ class LocationFix {
     required this.latitude,
     required this.longitude,
     required this.capturedAt,
-    this.accuracyM,
-    this.altitudeM,
     required this.source,
     required this.isMocked,
+    this.accuracyM,
+    this.altitudeM,
   });
 
   final double latitude;
@@ -53,12 +53,11 @@ class LocationService {
       throw const LocationDenied('Location permission was denied.');
     }
 
-    // geolocator 11+ uses locationSettings, NOT the removed desiredAccuracy.
+    // geolocator 12.x API: desiredAccuracy + timeLimit.
+    // (`locationSettings:` only exists from geolocator 13 onwards.)
     final p = await Geolocator.getCurrentPosition(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.bestForNavigation,
-        timeLimit: Duration(seconds: 25),
-      ),
+      desiredAccuracy: LocationAccuracy.bestForNavigation,
+      timeLimit: const Duration(seconds: 25),
     );
 
     return LocationFix(

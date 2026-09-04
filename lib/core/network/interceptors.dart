@@ -3,7 +3,6 @@ import 'dart:developer' as developer;
 import 'dart:math';
 
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 
 import '../storage/token_store.dart';
 import 'api_error.dart';
@@ -32,7 +31,9 @@ class AuthInterceptor extends QueuedInterceptor {
 
   @override
   Future<void> onRequest(
-      RequestOptions options, RequestInterceptorHandler handler) async {
+    RequestOptions options,
+    RequestInterceptorHandler handler,
+  ) async {
     if (options.extra[skipAuthFlag] == true) return handler.next(options);
 
     var tokens = await tokenStore.read();
@@ -47,11 +48,13 @@ class AuthInterceptor extends QueuedInterceptor {
 
   @override
   Future<void> onError(
-      DioException err, ErrorInterceptorHandler handler) async {
-    final o = err.requestOptions;
+    DioException err,
+    ErrorInterceptorHandler handler,
+  ) async {
+    final options = err.requestOptions;
     if (err.response?.statusCode != 401 ||
-        o.extra[retriedFlag] == true ||
-        o.extra[skipAuthFlag] == true) {
+        options.extra[retriedFlag] == true ||
+        options.extra[skipAuthFlag] == true) {
       return handler.next(err);
     }
 
@@ -64,12 +67,12 @@ class AuthInterceptor extends QueuedInterceptor {
     final refreshed = await _refresh(current.refreshToken);
     if (refreshed == null) return handler.next(err);
 
-    o.extra[retriedFlag] = true; // retry exactly once
-    o.headers['Authorization'] = 'Bearer ${refreshed.accessToken}';
+    options.extra[retriedFlag] = true; // retry exactly once
+    options.headers['Authorization'] = 'Bearer ${refreshed.accessToken}';
     try {
-      return handler.resolve(await refreshDio.fetch<dynamic>(o));
-    } on DioException catch (e) {
-      return handler.next(e);
+      return handler.resolve(await refreshDio.fetch<dynamic>(options));
+    } on DioException catch (retryError) {
+      return handler.next(retryError);
     }
   }
 
@@ -77,31 +80,32 @@ class AuthInterceptor extends QueuedInterceptor {
     final existing = _inFlight;
     if (existing != null) return existing.future;
 
-    final c = Completer<AuthTokens?>();
-    _inFlight = c;
+    final completer = Completer<AuthTokens?>();
+    _inFlight = completer;
     _perform(refreshToken)
-        .then(c.complete)
-        .catchError((Object _) => c.complete(null))
+        .then(completer.complete)
+        .catchError((Object _) => completer.complete(null))
         .whenComplete(() => _inFlight = null);
-    return c.future;
+    return completer.future;
   }
 
   Future<AuthTokens?> _perform(String refreshToken) async {
     try {
-      final r = await refreshDio.post<Map<String, dynamic>>(
+      final response = await refreshDio.post<Map<String, dynamic>>(
         '/auth/refresh',
         data: <String, dynamic>{'refreshToken': refreshToken},
         options: Options(extra: <String, dynamic>{skipAuthFlag: true}),
       );
-      final d = r.data;
-      if (d == null) return null;
+      final data = response.data;
+      if (data == null) return null;
 
       final tokens = AuthTokens(
-        accessToken: d['accessToken'] as String,
+        accessToken: data['accessToken'] as String,
         // Always store the NEW rotated token; never reuse the old one.
-        refreshToken: d['refreshToken'] as String,
-        expiresAt: DateTime.now()
-            .add(Duration(seconds: (d['expiresIn'] as num?)?.toInt() ?? 3600)),
+        refreshToken: data['refreshToken'] as String,
+        expiresAt: DateTime.now().add(
+          Duration(seconds: (data['expiresIn'] as num?)?.toInt() ?? 3600),
+        ),
       );
       await tokenStore.write(tokens);
       return tokens;
@@ -123,75 +127,100 @@ class RetryInterceptor extends Interceptor {
 
   final Dio dio;
   final int maxRetries;
-  static const String _k = 'sci.retryAttempt';
+
+  static const String _attemptKey = 'sci.retryAttempt';
   final Random _rng = Random();
 
   @override
   Future<void> onError(
-      DioException err, ErrorInterceptorHandler handler) async {
-    final o = err.requestOptions;
-    final attempt = (o.extra[_k] as int?) ?? 0;
+    DioException err,
+    ErrorInterceptorHandler handler,
+  ) async {
+    final options = err.requestOptions;
+    final attempt = (options.extra[_attemptKey] as int?) ?? 0;
     const safe = <String>{'GET', 'HEAD'};
 
     if (!_retryable(err) ||
-        !safe.contains(o.method.toUpperCase()) ||
+        !safe.contains(options.method.toUpperCase()) ||
         attempt >= maxRetries) {
       return handler.next(err);
     }
 
-    o.extra[_k] = attempt + 1;
-    await Future<void>.delayed(Duration(
-        milliseconds: 400 * pow(2, attempt).toInt() + _rng.nextInt(200)));
+    options.extra[_attemptKey] = attempt + 1;
+    await Future<void>.delayed(
+      Duration(
+        milliseconds: 400 * pow(2, attempt).toInt() + _rng.nextInt(200),
+      ),
+    );
     try {
-      return handler.resolve(await dio.fetch<dynamic>(o));
-    } on DioException catch (e) {
-      return handler.next(e);
+      return handler.resolve(await dio.fetch<dynamic>(options));
+    } on DioException catch (retryError) {
+      return handler.next(retryError);
     }
   }
 
-  bool _retryable(DioException e) => switch (e.type) {
-        DioExceptionType.connectionTimeout ||
-        DioExceptionType.receiveTimeout ||
-        DioExceptionType.sendTimeout ||
-        DioExceptionType.connectionError =>
-          true,
-        DioExceptionType.badResponse =>
-          <int>{502, 503, 504}.contains(e.response?.statusCode ?? 0),
-        _ => false,
-      };
+  bool _retryable(DioException e) {
+    switch (e.type) {
+      case DioExceptionType.connectionTimeout:
+      case DioExceptionType.receiveTimeout:
+      case DioExceptionType.sendTimeout:
+      case DioExceptionType.connectionError:
+        return true;
+      case DioExceptionType.badResponse:
+        return <int>{502, 503, 504}.contains(e.response?.statusCode ?? 0);
+      default:
+        return false;
+    }
+  }
 }
 
 /// Debug-only logger. Redacts every security-sensitive value.
 class RedactingLogInterceptor extends Interceptor {
-  static const Set<String> _keys = <String>{
-    'password', 'currentPassword', 'newPassword', 'accessToken',
-    'refreshToken', 'token', 'nationalId',
+  static const Set<String> _redactedKeys = <String>{
+    'password',
+    'currentPassword',
+    'newPassword',
+    'accessToken',
+    'refreshToken',
+    'token',
+    'nationalId',
   };
 
   @override
-  void onRequest(RequestOptions o, RequestInterceptorHandler h) {
-    developer.log('--> ${o.method} ${o.uri.path} ${_scrub(o.data)}',
-        name: 'SCI');
-    h.next(o);
+  void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
+    developer.log(
+      '--> ${options.method} ${options.uri.path} ${_scrub(options.data)}',
+      name: 'SCI',
+    );
+    handler.next(options);
   }
 
   @override
-  void onError(DioException e, ErrorInterceptorHandler h) {
+  void onError(DioException err, ErrorInterceptorHandler handler) {
     developer.log(
-        '<-- ERR ${e.response?.statusCode} ${e.requestOptions.uri.path} '
-        '${_scrub(e.response?.data)}',
-        name: 'SCI');
-    h.next(e);
+      '<-- ERR ${err.response?.statusCode} ${err.requestOptions.uri.path} '
+      '${_scrub(err.response?.data)}',
+      name: 'SCI',
+    );
+    handler.next(err);
   }
 
-  Object? _scrub(Object? d) {
-    if (d is FormData) return '<multipart ${d.files.length} file(s)>';
-    if (d is Map) {
-      return d.map<String, dynamic>((dynamic k, dynamic v) =>
-          MapEntry(k.toString(),
-              _keys.contains(k.toString()) ? '<redacted>' : _scrub(v)));
+  Object? _scrub(Object? data) {
+    if (data is FormData) {
+      // Never log raw binary evidence.
+      return '<multipart ${data.files.length} file(s)>';
     }
-    if (d is List) return d.map<Object?>((dynamic e) => _scrub(e)).toList();
-    return d;
+    if (data is Map) {
+      return data.map<String, dynamic>(
+        (dynamic k, dynamic v) => MapEntry(
+          k.toString(),
+          _redactedKeys.contains(k.toString()) ? '<redacted>' : _scrub(v),
+        ),
+      );
+    }
+    if (data is List) {
+      return data.map<Object?>((dynamic e) => _scrub(e)).toList();
+    }
+    return data;
   }
 }
