@@ -9,6 +9,7 @@ import '../../../templates/domain/template.dart';
 import '../../application/inspection_providers.dart';
 import '../../domain/inspection_status.dart';
 import 'section_pages.dart';
+import 'save_status_bar.dart';
 
 /// One workspace step. Sections come from the backend template; the fixed
 /// steps (owner, valuation, location, photos, review) are backend endpoints.
@@ -74,8 +75,8 @@ class _InspectionWorkspaceScreenState
           final target = steps.indexWhere(
               (s) => s.code == widget.initialSection!.toUpperCase());
           if (target >= 0) {
-            WidgetsBinding.instance.addPostFrameCallback(
-                (_) => setState(() => _index = target));
+            WidgetsBinding.instance
+                .addPostFrameCallback((_) => setState(() => _index = target));
           }
         }
 
@@ -116,19 +117,7 @@ class _InspectionWorkspaceScreenState
                   color: AppColors.offline,
                   icon: Icons.lock_outline_rounded,
                 ),
-              if (ws.staleVersion)
-                MessageBanner(
-                  message:
-                      'This inspection was changed on another device or '
-                      'session. Refresh before continuing.',
-                  color: AppColors.danger,
-                  action: TextButton(
-                    onPressed: () => ref
-                        .read(inspectionWorkspaceProvider(id).notifier)
-                        .reload(),
-                    child: const Text('Refresh inspection'),
-                  ),
-                ),
+              SaveStatusBar(inspectionId: id),
               if (inspection.status.isCorrection)
                 const MessageBanner(
                   message: 'Corrections were requested by the reviewer. '
@@ -141,8 +130,7 @@ class _InspectionWorkspaceScreenState
           ),
           bottomNavigationBar: _ProgressBar(
             inspectionId: id,
-            onOpenReview: () =>
-                setState(() => _index = steps.length - 1),
+            onOpenReview: () => setState(() => _index = steps.length - 1),
           ),
         );
       },
@@ -449,9 +437,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
                       .where((s) => s != null && s.isNotEmpty)
                       .join(' · '),
                   icon: Icons.error_outline_rounded,
-                  color: issue.blocking
-                      ? AppColors.danger
-                      : AppColors.warning,
+                  color: issue.blocking ? AppColors.danger : AppColors.warning,
                   // Machine-readable codes drive deep linking.
                   onTap: issue.sectionCode == null
                       ? null
@@ -461,9 +447,8 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
           ],
           const SizedBox(height: AppSpacing.md),
           FilledButton(
-            onPressed: canSubmit && !_busy
-                ? () => _submit(status.isCorrection)
-                : null,
+            onPressed:
+                canSubmit && !_busy ? () => _submit(status.isCorrection) : null,
             child: _busy
                 ? const ButtonSpinner()
                 : Text(status.isCorrection
@@ -477,8 +462,8 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
                 'The server re-checks completeness at submission. You may '
                 'attempt submission, but incomplete inspections are rejected.',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                    fontSize: 11.5, color: AppColors.textSecondary),
+                style:
+                    TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
               ),
             ),
           const SizedBox(height: 120),

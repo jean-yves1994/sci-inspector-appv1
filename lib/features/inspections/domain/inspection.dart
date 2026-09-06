@@ -1,3 +1,4 @@
+import '../../../core/utils/json_read.dart';
 import '../../templates/domain/template.dart';
 import 'inspection_status.dart';
 
@@ -39,42 +40,41 @@ class InspectionValue {
     return j;
   }
 
-  factory InspectionValue.fromJson(Map<String, dynamic> j) {
-    final raw = j['valueJson'];
-    return InspectionValue(
-      fieldId: j['fieldId'] as String? ?? j['templateFieldId'] as String? ?? '',
-      valueText: j['valueText'] as String?,
-      valueNumber: (j['valueNumber'] as num?)?.toDouble(),
-      valueBool: j['valueBool'] as bool?,
-      valueDate: j['valueDate'] is String
-          ? DateTime.tryParse(j['valueDate'] as String)
-          : null,
-      valueJson: raw is List
-          ? raw.map((dynamic e) => e.toString()).toList()
-          : null,
-    );
-  }
+  /// `valueNumber` is a Prisma Decimal and arrives as a STRING ("300").
+  /// The previous `as num?` cast is what threw:
+  ///   type 'String' is not a subtype of type 'num?'
+  factory InspectionValue.fromJson(Map<String, dynamic> j) => InspectionValue(
+        fieldId: J.asString(j['fieldId']) ??
+            J.asString(j['templateFieldId']) ??
+            '',
+        valueText: J.asString(j['valueText']),
+        valueNumber: J.asDouble(j['valueNumber']),
+        valueBool: J.asBool(j['valueBool']),
+        valueDate: J.asDate(j['valueDate']),
+        valueJson: J.asStringList(j['valueJson']),
+      );
 
   /// Builds the correctly-typed value for a given field.
   static InspectionValue forField(TemplateField f, Object? raw) {
     switch (f.type) {
       case FieldType.number:
       case FieldType.currency:
-        return InspectionValue(
-          fieldId: f.id,
-          valueNumber: raw is num
-              ? raw.toDouble()
-              : double.tryParse(raw?.toString() ?? ''),
-        );
+        return InspectionValue(fieldId: f.id, valueNumber: J.asDouble(raw));
+
       case FieldType.boolean:
-        return InspectionValue(fieldId: f.id, valueBool: raw as bool?);
+        return InspectionValue(fieldId: f.id, valueBool: J.asBool(raw));
+
       case FieldType.date:
-        return InspectionValue(fieldId: f.id, valueDate: raw as DateTime?);
+        return InspectionValue(fieldId: f.id, valueDate: J.asDate(raw));
+
       case FieldType.multiSelect:
+        // `raw is List<String>` was false for the List<dynamic> a FilterChip
+        // produces, so selections were silently discarded.
         return InspectionValue(
           fieldId: f.id,
-          valueJson: raw is List<String> ? raw : const <String>[],
+          valueJson: J.asStringList(raw) ?? const <String>[],
         );
+
       case FieldType.text:
       case FieldType.textarea:
       case FieldType.select:
@@ -82,7 +82,7 @@ class InspectionValue {
       case FieldType.email:
       case FieldType.nationalId:
       case FieldType.unknown:
-        return InspectionValue(fieldId: f.id, valueText: raw?.toString());
+        return InspectionValue(fieldId: f.id, valueText: J.asString(raw));
     }
   }
 }
@@ -95,6 +95,7 @@ enum ConditionRating {
   excellent('EXCELLENT', 5, 'Excellent');
 
   const ConditionRating(this.wire, this.rating, this.label);
+
   final String wire;
   final int rating;
   final String label;
@@ -125,11 +126,11 @@ class InspectionAssessment {
 
   factory InspectionAssessment.fromJson(Map<String, dynamic> j) =>
       InspectionAssessment(
-        categoryCode: j['categoryCode'] as String? ?? '',
-        categoryName: j['categoryName'] as String? ?? '',
-        rating: (j['rating'] as num?)?.toInt(),
-        condition: j['condition'] as String?,
-        notes: j['notes'] as String?,
+        categoryCode: J.asString(j['categoryCode']) ?? '',
+        categoryName: J.asString(j['categoryName']) ?? '',
+        rating: J.asInt(j['rating']),
+        condition: J.asString(j['condition']),
+        notes: J.asString(j['notes']),
       );
 
   Map<String, dynamic> toJson() => <String, dynamic>{
@@ -159,12 +160,19 @@ class InspectionOwner {
   final String? ownershipType;
 
   static const List<String> occupancyOptions = <String>[
-    'OWNER_OCCUPIED', 'TENANT_OCCUPIED', 'VACANT',
-    'PARTIALLY_OCCUPIED', 'UNDER_CONSTRUCTION',
+    'OWNER_OCCUPIED',
+    'TENANT_OCCUPIED',
+    'VACANT',
+    'PARTIALLY_OCCUPIED',
+    'UNDER_CONSTRUCTION',
   ];
 
   static const List<String> ownershipOptions = <String>[
-    'FREEHOLD', 'LEASEHOLD', 'CUSTOMARY', 'CO_OWNERSHIP', 'COMPANY_OWNED',
+    'FREEHOLD',
+    'LEASEHOLD',
+    'CUSTOMARY',
+    'CO_OWNERSHIP',
+    'COMPANY_OWNED',
   ];
 
   static String humanise(String v) {
@@ -176,12 +184,14 @@ class InspectionOwner {
   }
 
   factory InspectionOwner.fromJson(Map<String, dynamic> j) => InspectionOwner(
-        fullName: j['fullName'] as String?,
-        nationalId: j['nationalId'] as String?,
-        phone: j['phone'] as String?,
-        email: j['email'] as String?,
-        occupancyStatus: j['occupancyStatus'] as String?,
-        ownershipType: j['ownershipType'] as String?,
+        fullName: J.asString(j['fullName']),
+        // The server stores this encrypted and returns nationalIdEnc; a
+        // decrypted `nationalId` may or may not be present.
+        nationalId: J.asString(j['nationalId']),
+        phone: J.asString(j['phone']),
+        email: J.asString(j['email']),
+        occupancyStatus: J.asString(j['occupancyStatus']),
+        ownershipType: J.asString(j['ownershipType']),
       );
 
   Map<String, dynamic> toJson() {
@@ -219,14 +229,15 @@ class InspectionValuation {
   final double? rentalEstimate;
   final String? comments;
 
+  /// All four money fields are Prisma Decimals — they arrive as strings.
   factory InspectionValuation.fromJson(Map<String, dynamic> j) =>
       InspectionValuation(
-        currency: j['currency'] as String? ?? 'RWF',
-        marketValue: (j['marketValue'] as num?)?.toDouble(),
-        forcedSaleValue: (j['forcedSaleValue'] as num?)?.toDouble(),
-        replacementCost: (j['replacementCost'] as num?)?.toDouble(),
-        rentalEstimate: (j['rentalEstimate'] as num?)?.toDouble(),
-        comments: j['comments'] as String?,
+        currency: J.asString(j['currency']) ?? 'RWF',
+        marketValue: J.asDouble(j['marketValue']),
+        forcedSaleValue: J.asDouble(j['forcedSaleValue']),
+        replacementCost: J.asDouble(j['replacementCost']),
+        rentalEstimate: J.asDouble(j['rentalEstimate']),
+        comments: J.asString(j['comments']),
       );
 
   Map<String, dynamic> toJson() {
@@ -250,6 +261,7 @@ class InspectionLocation {
     this.source,
     this.isMocked,
     this.capturedAt,
+    this.distanceFromPropertyM,
   });
 
   final double latitude;
@@ -260,17 +272,20 @@ class InspectionLocation {
   final bool? isMocked;
   final DateTime? capturedAt;
 
+  /// Server-calculated. Present on the location row itself.
+  final double? distanceFromPropertyM;
+
+  /// Latitude and longitude are Decimals — always quoted in the response.
   factory InspectionLocation.fromJson(Map<String, dynamic> j) =>
       InspectionLocation(
-        latitude: (j['latitude'] as num?)?.toDouble() ?? 0,
-        longitude: (j['longitude'] as num?)?.toDouble() ?? 0,
-        accuracyM: (j['accuracyM'] as num?)?.toDouble(),
-        altitudeM: (j['altitudeM'] as num?)?.toDouble(),
-        source: j['source'] as String?,
-        isMocked: j['isMocked'] as bool?,
-        capturedAt: j['capturedAt'] is String
-            ? DateTime.tryParse(j['capturedAt'] as String)
-            : null,
+        latitude: J.asDouble(j['latitude']) ?? 0,
+        longitude: J.asDouble(j['longitude']) ?? 0,
+        accuracyM: J.asDouble(j['accuracyM']),
+        altitudeM: J.asDouble(j['altitudeM']),
+        source: J.asString(j['source']),
+        isMocked: J.asBool(j['isMocked']),
+        capturedAt: J.asDate(j['capturedAt']),
+        distanceFromPropertyM: J.asDouble(j['distanceFromPropertyM']),
       );
 }
 
@@ -283,10 +298,10 @@ class GpsProximity {
   final bool? withinTolerance;
 
   factory GpsProximity.fromJson(Map<String, dynamic> j) => GpsProximity(
-        distanceM: (j['distanceM'] as num?)?.toDouble() ??
-            (j['distanceMeters'] as num?)?.toDouble(),
-        verdict: j['verdict'] as String? ?? j['status'] as String?,
-        withinTolerance: j['withinTolerance'] as bool?,
+        distanceM:
+            J.asDouble(j['distanceM']) ?? J.asDouble(j['distanceMeters']),
+        verdict: J.asString(j['verdict']) ?? J.asString(j['status']),
+        withinTolerance: J.asBool(j['withinTolerance']),
       );
 }
 
@@ -305,17 +320,19 @@ class CompletenessIssue {
   final String? fieldCode;
   final bool blocking;
 
-  factory CompletenessIssue.fromJson(Map<String, dynamic> j,
-          {bool blocking = true}) =>
+  factory CompletenessIssue.fromJson(
+    Map<String, dynamic> j, {
+    bool blocking = true,
+  }) =>
       CompletenessIssue(
-        message: j['message'] as String? ??
-            j['description'] as String? ??
-            j['code'] as String? ??
+        message: J.asString(j['message']) ??
+            J.asString(j['description']) ??
+            J.asString(j['code']) ??
             'Requirement outstanding',
-        code: j['code'] as String?,
-        sectionCode: j['sectionCode'] as String?,
-        fieldCode: j['fieldCode'] as String?,
-        blocking: j['blocking'] as bool? ?? blocking,
+        code: J.asString(j['code']),
+        sectionCode: J.asString(j['sectionCode']),
+        fieldCode: J.asString(j['fieldCode']),
+        blocking: J.asBool(j['blocking']) ?? blocking,
       );
 }
 
@@ -345,8 +362,8 @@ class CompletenessResult {
         : const <CompletenessIssue>[];
 
     return CompletenessResult(
-      complete: j['complete'] as bool? ?? false,
-      percentage: (j['percentage'] as num?)?.toInt() ?? 0,
+      complete: J.asBool(j['complete']) ?? false,
+      percentage: J.asInt(j['percentage']) ?? 0,
       issues: parse(j['issues'], false),
       blockingIssues: parse(j['blockingIssues'], true),
     );
@@ -361,19 +378,19 @@ class InspectionComment {
   final DateTime? createdAt;
 
   factory InspectionComment.fromJson(Map<String, dynamic> j) {
-    final author = j['author'];
+    final author = J.asMap(j['author']);
     return InspectionComment(
-      body: j['body'] as String? ??
-          j['message'] as String? ??
-          j['comment'] as String? ??
-          j['reason'] as String? ??
+      body: J.asString(j['body']) ??
+          J.asString(j['message']) ??
+          J.asString(j['comment']) ??
+          J.asString(j['reason']) ??
           '',
-      author: author is Map<String, dynamic>
-          ? '${author['firstName'] ?? ''} ${author['lastName'] ?? ''}'.trim()
-          : author as String?,
-      createdAt: j['createdAt'] is String
-          ? DateTime.tryParse(j['createdAt'] as String)
-          : null,
+      author: author != null
+          ? '${J.asString(author['firstName']) ?? ''} '
+                  '${J.asString(author['lastName']) ?? ''}'
+              .trim()
+          : J.asString(j['author']),
+      createdAt: J.asDate(j['createdAt']),
     );
   }
 }
@@ -411,7 +428,7 @@ class Inspection {
   final InspectionStatus status;
   final InspectionPriority priority;
 
-  /// Optimistic concurrency token sent as baseVersion on every mutation.
+  /// Optimistic concurrency token.
   final int version;
 
   final String? inspectionNumber;
@@ -437,12 +454,47 @@ class Inspection {
   final List<InspectionComment> corrections;
 
   bool get isEditable => status.isEditable;
+
   InspectionLocation? get latestLocation =>
-      locations.isEmpty ? null : locations.last;
+      locations.isEmpty ? null : locations.first;
+
+  /// Narrow copy used to adopt a post-write concurrency token without
+  /// refetching the whole aggregate.
+  Inspection copyWith({
+    int? version,
+    InspectionStatus? status,
+    CompletenessResult? completeness,
+  }) =>
+      Inspection(
+        id: id,
+        status: status ?? this.status,
+        priority: priority,
+        version: version ?? this.version,
+        inspectionNumber: inspectionNumber,
+        loanReference: loanReference,
+        clientName: clientName,
+        propertyId: propertyId,
+        propertyReference: propertyReference,
+        propertyName: propertyName,
+        templateId: templateId,
+        dueDate: dueDate,
+        submittedAt: submittedAt,
+        reviewerName: reviewerName,
+        template: template,
+        values: values,
+        assessments: assessments,
+        owner: owner,
+        valuation: valuation,
+        locations: locations,
+        proximity: proximity,
+        completeness: completeness ?? this.completeness,
+        comments: comments,
+        corrections: corrections,
+      );
 
   factory Inspection.fromJson(Map<String, dynamic> j) {
-    final property = j['property'];
-    final reviewer = j['reviewer'];
+    final property = J.asMap(j['property']);
+    final reviewer = J.asMap(j['reviewer']);
 
     List<T> listOf<T>(Object? raw, T Function(Map<String, dynamic>) f) =>
         raw is List
@@ -450,48 +502,42 @@ class Inspection {
             : <T>[];
 
     return Inspection(
-      id: j['id'] as String,
-      status: InspectionStatusX.parse(j['status'] as String?),
-      priority: InspectionPriority.parse(j['priority'] as String?),
-      version: (j['version'] as num?)?.toInt() ?? 0,
-      inspectionNumber: j['inspectionNumber'] as String?,
-      loanReference: j['loanReference'] as String?,
-      clientName: j['clientName'] as String?,
-      propertyId: j['propertyId'] as String? ??
-          (property is Map<String, dynamic> ? property['id'] as String? : null),
-      propertyReference: property is Map<String, dynamic>
-          ? property['reference'] as String?
+      id: J.asString(j['id']) ?? '',
+      status: InspectionStatusX.parse(J.asString(j['status'])),
+      priority: InspectionPriority.parse(J.asString(j['priority'])),
+      version: J.asInt(j['version']) ?? 0,
+      inspectionNumber: J.asString(j['inspectionNumber']),
+      loanReference: J.asString(j['loanReference']),
+      clientName: J.asString(j['clientName']),
+      propertyId:
+          J.asString(j['propertyId']) ?? J.asString(property?['id']),
+      propertyReference: J.asString(property?['reference']),
+      propertyName: J.asString(property?['name']),
+      templateId: J.asString(j['templateId']),
+      dueDate: J.asDate(j['dueDate']),
+      submittedAt: J.asDate(j['submittedAt']),
+      reviewerName: reviewer != null
+          ? '${J.asString(reviewer['firstName']) ?? ''} '
+                  '${J.asString(reviewer['lastName']) ?? ''}'
+              .trim()
           : null,
-      propertyName:
-          property is Map<String, dynamic> ? property['name'] as String? : null,
-      templateId: j['templateId'] as String?,
-      dueDate:
-          j['dueDate'] is String ? DateTime.tryParse(j['dueDate'] as String) : null,
-      submittedAt: j['submittedAt'] is String
-          ? DateTime.tryParse(j['submittedAt'] as String)
-          : null,
-      reviewerName: reviewer is Map<String, dynamic>
-          ? '${reviewer['firstName'] ?? ''} ${reviewer['lastName'] ?? ''}'.trim()
-          : null,
-      template: j['template'] is Map<String, dynamic>
-          ? InspectionTemplate.fromJson(j['template'] as Map<String, dynamic>)
+      template: J.asMap(j['template']) != null
+          ? InspectionTemplate.fromJson(J.asMap(j['template'])!)
           : null,
       values: listOf(j['values'], InspectionValue.fromJson),
       assessments: listOf(j['assessments'], InspectionAssessment.fromJson),
-      owner: j['owner'] is Map<String, dynamic>
-          ? InspectionOwner.fromJson(j['owner'] as Map<String, dynamic>)
+      owner: J.asMap(j['owner']) != null
+          ? InspectionOwner.fromJson(J.asMap(j['owner'])!)
           : null,
-      valuation: j['valuation'] is Map<String, dynamic>
-          ? InspectionValuation.fromJson(
-              j['valuation'] as Map<String, dynamic>)
+      valuation: J.asMap(j['valuation']) != null
+          ? InspectionValuation.fromJson(J.asMap(j['valuation'])!)
           : null,
       locations: listOf(j['locations'], InspectionLocation.fromJson),
-      proximity: j['proximity'] is Map<String, dynamic>
-          ? GpsProximity.fromJson(j['proximity'] as Map<String, dynamic>)
+      proximity: J.asMap(j['proximity']) != null
+          ? GpsProximity.fromJson(J.asMap(j['proximity'])!)
           : null,
-      completeness: j['completeness'] is Map<String, dynamic>
-          ? CompletenessResult.fromJson(
-              j['completeness'] as Map<String, dynamic>)
+      completeness: J.asMap(j['completeness']) != null
+          ? CompletenessResult.fromJson(J.asMap(j['completeness'])!)
           : null,
       comments: listOf(j['comments'], InspectionComment.fromJson),
       corrections: listOf(j['corrections'], InspectionComment.fromJson),
@@ -526,27 +572,21 @@ class InspectionListItem {
   final int? percentage;
 
   factory InspectionListItem.fromJson(Map<String, dynamic> j) {
-    final property = j['property'];
-    final completeness = j['completeness'];
+    final property = J.asMap(j['property']);
+    final completeness = J.asMap(j['completeness']);
 
     return InspectionListItem(
-      id: j['id'] as String,
-      status: InspectionStatusX.parse(j['status'] as String?),
-      priority: InspectionPriority.parse(j['priority'] as String?),
-      inspectionNumber: j['inspectionNumber'] as String?,
-      loanReference: j['loanReference'] as String?,
-      clientName: j['clientName'] as String?,
-      propertyReference: property is Map<String, dynamic>
-          ? property['reference'] as String?
-          : null,
-      propertyName:
-          property is Map<String, dynamic> ? property['name'] as String? : null,
-      dueDate: j['dueDate'] is String
-          ? DateTime.tryParse(j['dueDate'] as String)
-          : null,
-      percentage: completeness is Map<String, dynamic>
-          ? (completeness['percentage'] as num?)?.toInt()
-          : (j['completionPercentage'] as num?)?.toInt(),
+      id: J.asString(j['id']) ?? '',
+      status: InspectionStatusX.parse(J.asString(j['status'])),
+      priority: InspectionPriority.parse(J.asString(j['priority'])),
+      inspectionNumber: J.asString(j['inspectionNumber']),
+      loanReference: J.asString(j['loanReference']),
+      clientName: J.asString(j['clientName']),
+      propertyReference: J.asString(property?['reference']),
+      propertyName: J.asString(property?['name']),
+      dueDate: J.asDate(j['dueDate']),
+      percentage: J.asInt(completeness?['percentage']) ??
+          J.asInt(j['completionPercentage']),
     );
   }
 }

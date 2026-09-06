@@ -1,5 +1,5 @@
 {
-  "SCI_API_URL": "https://sci-server.vercel.app/api/v1",
+  "SCI_API_URL": "https://server.realcovenants.com/api/v1",
   "SCI_ENV": "development",
   "SCI_PLATFORM": "android"
 }

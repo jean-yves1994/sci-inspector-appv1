@@ -3,6 +3,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
+//Test import
+import 'diagnostic_interceptor.dart';
+
 import '../config/app_config.dart';
 import '../storage/token_store.dart';
 import 'api_error.dart';
@@ -65,6 +68,8 @@ final dioProvider = Provider<Dio>((ref) {
           ref.read(sessionInvalidatedProvider.notifier).invalidate(reason),
     ),
     RetryInterceptor(dio: dio),
+    //Test debug interceptors. Only active in debug builds.
+    if (kDebugMode) DiagnosticInterceptor(),
     if (kDebugMode) RedactingLogInterceptor(),
   ]);
 

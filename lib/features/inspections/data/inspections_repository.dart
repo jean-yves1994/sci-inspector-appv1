@@ -7,60 +7,68 @@ import '../../../core/network/pagination_params.dart';
 import '../domain/inspection.dart';
 import '../domain/inspection_status.dart';
 
-/// What a mutation endpoint actually returned.
+/// What a mutation returned.
 ///
-/// The SCI API does not use one response shape for mutations — verified by
-/// probe against the live server:
+/// The API uses several shapes, confirmed by probe:
 ///
-///   POST  /:id/start      -> full inspection aggregate (has `version`)
-///   PATCH /:id/owner      -> completeness result       (no `version`)
-///   PATCH /:id/valuation  -> completeness result       (no `version`)
-///   PATCH /:id/values     -> completeness result       (assumed, same family)
-///   PATCH /:id/assessments-> completeness result       (assumed, same family)
-///   POST  /:id/location   -> { location, proximity }   (no `version`)
+///   POST  /:id/start       -> full aggregate            id, status, version
+///   POST  /:id/submit      -> full aggregate            id, status, version
+///   PATCH /:id/values      -> completeness (+ version)  no id
+///   PATCH /:id/assessments -> completeness (+ version)  no id
+///   PATCH /:id/owner       -> completeness (+ version)  no id
+///   PATCH /:id/valuation   -> completeness (+ version)  no id
+///   POST  /:id/location    -> { location, proximity } (+ version)
 ///
-/// Blindly calling `Inspection.fromJson` on all of these crashes, because a
-/// completeness payload has no `id`. This type lets the caller see what it
-/// actually got and react, rather than guessing.
+/// `version` is read independently of the payload shape, so it is picked up
+/// whether or not the backend patch that adds it has been deployed.
 class MutationResult {
   const MutationResult({
     this.inspection,
     this.completeness,
     this.location,
     this.proximity,
+    this.version,
+    this.status,
   });
 
-  /// Present only when the endpoint returned the full aggregate.
   final Inspection? inspection;
-
-  /// Present when the endpoint returned completeness — most PATCH endpoints
-  /// do. Using it avoids a follow-up GET /completeness.
   final CompletenessResult? completeness;
-
   final InspectionLocation? location;
   final GpsProximity? proximity;
+  final int? version;
+  final String? status;
 
-  /// True when the caller must refetch to learn the new version.
-  bool get needsRefetch => inspection == null;
+  static int? _readVersion(Map<String, dynamic> body) {
+    final raw = body['version'];
+    if (raw is num) return raw.toInt();
+    if (raw is String) return int.tryParse(raw);
+    return null;
+  }
 
-  /// Classifies an arbitrary mutation response without throwing.
+  /// Classifies any response without throwing.
   factory MutationResult.parse(Map<String, dynamic> json) {
     final body = unwrap(json);
+    final version = _readVersion(body);
+    final status = body['status'] is String ? body['status'] as String : null;
 
-    // A full aggregate is identifiable by `id` + `status`. Requiring both
-    // avoids mistaking a sub-resource that happens to carry an id.
     if (body['id'] is String && body['status'] is String) {
-      return MutationResult(inspection: Inspection.fromJson(body));
-    }
-
-    // Completeness: { complete, percentage, issues, blockingIssues }
-    if (body.containsKey('complete') || body.containsKey('percentage')) {
+      final inspection = Inspection.fromJson(body);
       return MutationResult(
-        completeness: CompletenessResult.fromJson(body),
+        inspection: inspection,
+        completeness: inspection.completeness,
+        version: version ?? inspection.version,
+        status: status,
       );
     }
 
-    // Location: { location, proximity }
+    if (body.containsKey('complete') || body.containsKey('percentage')) {
+      return MutationResult(
+        completeness: CompletenessResult.fromJson(body),
+        version: version,
+        status: status,
+      );
+    }
+
     if (body.containsKey('location') || body.containsKey('proximity')) {
       final loc = body['location'];
       final prox = body['proximity'];
@@ -68,15 +76,14 @@ class MutationResult {
         location: loc is Map<String, dynamic>
             ? InspectionLocation.fromJson(loc)
             : null,
-        proximity: prox is Map<String, dynamic>
-            ? GpsProximity.fromJson(prox)
-            : null,
+        proximity:
+            prox is Map<String, dynamic> ? GpsProximity.fromJson(prox) : null,
+        version: version,
+        status: status,
       );
     }
 
-    // Unknown shape: report nothing rather than fabricate an Inspection with
-    // version 0, which is what corrupted the local state before.
-    return const MutationResult();
+    return MutationResult(version: version, status: status);
   }
 }
 
@@ -84,6 +91,8 @@ class InspectionsRepository {
   const InspectionsRepository(this._api);
 
   final ApiClient _api;
+
+  // ------------------------------------------------------------- reading
 
   Future<Paginated<InspectionListItem>> list({
     String? search,
@@ -117,11 +126,28 @@ class InspectionsRepository {
     return Inspection.fromJson(unwrap(d));
   }
 
+  /// Reads ONLY the concurrency token.
+  ///
+  /// Every write calls this immediately beforehand, so `baseVersion` is always
+  /// the server's current value rather than a number cached earlier in the
+  /// session. This removes version drift as a category of bug: no cached
+  /// version means nothing to go stale.
+  ///
+  /// Costs one small GET per save. Optimistic concurrency remains enforced
+  /// server-side — the conflict window narrows to the milliseconds between
+  /// this read and the write, rather than the minutes a screen stays open.
+  Future<int> currentVersion(String id) async {
+    final inspection = await byId(id);
+    return inspection.version;
+  }
+
   Future<CompletenessResult> completeness(String id) async {
     final d =
         await _api.get<Map<String, dynamic>>('/inspections/$id/completeness');
     return CompletenessResult.fromJson(unwrap(d));
   }
+
+  // ------------------------------------------------------------ creating
 
   /// Inspectors cannot assign; the backend assigns the creator automatically.
   Future<Inspection> create({
@@ -150,21 +176,22 @@ class InspectionsRepository {
     return Inspection.fromJson(unwrap(d));
   }
 
-  /// Returns the full aggregate — verified by probe (version=2, IN_PROGRESS).
   Future<Inspection> start(String id) async {
     final d = await _api.post<Map<String, dynamic>>('/inspections/$id/start');
     return Inspection.fromJson(unwrap(d));
   }
 
-  // --------------------------------------------------------- mutations
-  // Each returns MutationResult, never a bare Inspection, because the
-  // response shape varies by endpoint.
+  // ----------------------------------------------------------- mutations
+  //
+  // Each reads the authoritative version first. If the write still returns a
+  // stale-version conflict, it means a genuine concurrent writer, and the
+  // error propagates rather than being retried blindly.
 
   Future<MutationResult> saveValues({
     required String id,
     required List<InspectionValue> values,
-    required int baseVersion,
   }) async {
+    final baseVersion = await currentVersion(id);
     final d = await _api.patch<Map<String, dynamic>>(
       '/inspections/$id/values',
       body: <String, dynamic>{
@@ -178,8 +205,8 @@ class InspectionsRepository {
   Future<MutationResult> saveAssessment({
     required String id,
     required InspectionAssessment assessment,
-    required int baseVersion,
   }) async {
+    final baseVersion = await currentVersion(id);
     final d = await _api.patch<Map<String, dynamic>>(
       '/inspections/$id/assessments',
       body: <String, dynamic>{
@@ -193,8 +220,8 @@ class InspectionsRepository {
   Future<MutationResult> saveOwner({
     required String id,
     required InspectionOwner owner,
-    required int baseVersion,
   }) async {
+    final baseVersion = await currentVersion(id);
     final d = await _api.patch<Map<String, dynamic>>(
       '/inspections/$id/owner',
       body: <String, dynamic>{...owner.toJson(), 'baseVersion': baseVersion},
@@ -205,8 +232,8 @@ class InspectionsRepository {
   Future<MutationResult> saveValuation({
     required String id,
     required InspectionValuation valuation,
-    required int baseVersion,
   }) async {
+    final baseVersion = await currentVersion(id);
     final d = await _api.patch<Map<String, dynamic>>(
       '/inspections/$id/valuation',
       body: <String, dynamic>{
@@ -221,13 +248,13 @@ class InspectionsRepository {
     required String id,
     required double latitude,
     required double longitude,
-    required int baseVersion,
     double? accuracyM,
     double? altitudeM,
     String source = 'GPS',
     bool isMocked = false,
     DateTime? capturedAt,
   }) async {
+    final baseVersion = await currentVersion(id);
     final d = await _api.post<Map<String, dynamic>>(
       '/inspections/$id/location',
       body: <String, dynamic>{
@@ -244,7 +271,7 @@ class InspectionsRepository {
     return MutationResult.parse(d);
   }
 
-  /// The backend decides SUBMIT vs RESUBMIT from the current status, and
+  /// The backend decides SUBMIT vs RESUBMIT from the current status and
   /// re-validates completeness server-side before accepting.
   Future<MutationResult> submit(String id) async {
     final d = await _api.post<Map<String, dynamic>>('/inspections/$id/submit');
