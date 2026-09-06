@@ -7,7 +7,7 @@ class AppConfig {
 
   static const String apiBaseUrl = String.fromEnvironment(
     'SCI_API_URL',
-    defaultValue: 'https://sci-server.vercel.app/api/v1',
+    defaultValue: 'https://server.realcovenants.com/api/v1',
   );
 
   static const String environment = String.fromEnvironment(
