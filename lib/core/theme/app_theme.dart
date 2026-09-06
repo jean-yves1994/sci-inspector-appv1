@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 
 class AppColors {
   const AppColors._();
-  static const Color primary = Color(0xFF2747AA);
-  static const Color primaryDark = Color(0xFF1B3178);
+  static const Color primary = Color.fromARGB(255, 29, 60, 153);
+  static const Color primaryDark = Color.fromARGB(255, 11, 20, 99);
   static const Color primaryLight = Color(0xFF4C6BD4);
   static const List<Color> authHeroGradient = <Color>[
-    Color(0xFF3A5FD0), Color(0xFF2747AA), Color(0xFF1B3178),
+    Color(0xFF3A5FD0),
+    Color(0xFF2747AA),
+    Color(0xFF1B3178),
   ];
   static const Color surfaceLight = Color(0xFFF6F7FB);
   static const Color surfaceDark = Color(0xFF0E1116);
@@ -23,13 +25,24 @@ class AppColors {
 
 class AppSpacing {
   const AppSpacing._();
-  static const double xxs = 4, xs = 8, sm = 12, md = 16, lg = 20, xl = 24,
-      xxl = 32, xxxl = 40, touchTarget = 48;
+  static const double xxs = 4,
+      xs = 8,
+      sm = 12,
+      md = 16,
+      lg = 20,
+      xl = 24,
+      xxl = 32,
+      xxxl = 40,
+      touchTarget = 48;
 }
 
 class AppRadius {
   const AppRadius._();
-  static const double sm = 10, md = 14, lg = 16, xl = 20, xxl = 24,
+  static const double sm = 10,
+      md = 14,
+      lg = 16,
+      xl = 20,
+      xxl = 24,
       authCard = 32;
 }
 
@@ -96,8 +109,7 @@ class AppTheme {
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           minimumSize: const Size.fromHeight(54),
-          textStyle:
-              const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
           shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AppRadius.xxl)),
         ),
@@ -105,8 +117,8 @@ class AppTheme {
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(foregroundColor: AppColors.primary),
       ),
-      snackBarTheme: const SnackBarThemeData(
-          behavior: SnackBarBehavior.floating),
+      snackBarTheme:
+          const SnackBarThemeData(behavior: SnackBarBehavior.floating),
     );
   }
 }
