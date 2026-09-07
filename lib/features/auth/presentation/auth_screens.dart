@@ -230,7 +230,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               SciTextField(
                 controller: _email,
                 label: 'EMAIL',
-                hint: 'inspector@sci.rw',
+                hint: 'Enter your account email',
                 icon: Icons.alternate_email_rounded,
                 keyboardType: TextInputType.emailAddress,
                 textInputAction: TextInputAction.next,
@@ -242,7 +242,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               SciTextField(
                 controller: _password,
                 label: 'PASSWORD',
-                hint: '••••••••',
+                hint: 'Enter your account password',
                 icon: Icons.lock_outline_rounded,
                 obscureText: _obscure,
                 onToggleObscure: () => setState(() => _obscure = !_obscure),
@@ -341,8 +341,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                 const SizedBox(height: AppSpacing.md),
                 const Text(
                   'Check your email',
-                  style:
-                      TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
@@ -600,9 +599,8 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
             const SizedBox(height: AppSpacing.lg),
             FilledButton(
               onPressed: _busy ? null : _submit,
-              child: _busy
-                  ? const ButtonSpinner()
-                  : const Text('Update password'),
+              child:
+                  _busy ? const ButtonSpinner() : const Text('Update password'),
             ),
             if (forced) ...<Widget>[
               const SizedBox(height: AppSpacing.xs),

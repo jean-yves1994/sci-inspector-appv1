@@ -14,7 +14,7 @@
 param(
     [Parameter(Mandatory = $true)][string]$Email,
     [Parameter(Mandatory = $true)][string]$Password,
-    [string]$BaseUrl = 'https://sci-server.vercel.app/api/v1',
+    [string]$BaseUrl = 'https://server.realcovenants.com/api/v1',
     [string]$Platform = 'android'   # mirrors the app's dev override
 )
 

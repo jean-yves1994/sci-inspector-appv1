@@ -62,8 +62,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget build(BuildContext context) {
     // Surface an involuntary sign-out reason, e.g. a revoked session.
     final session = ref.watch(sessionControllerProvider);
-    final reason =
-        session is SessionUnauthenticated ? session.reason : null;
+    final reason = session is SessionUnauthenticated ? session.reason : null;
 
     return AuthScaffold(
       title: 'Welcome back',
@@ -87,7 +86,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               SciTextField(
                 controller: _email,
                 label: 'EMAIL',
-                hint: 'inspector@sci.rw',
+                hint: 'Enter your account email',
                 icon: Icons.alternate_email_rounded,
                 keyboardType: TextInputType.emailAddress,
                 textInputAction: TextInputAction.next,
@@ -100,7 +99,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               SciTextField(
                 controller: _password,
                 label: 'PASSWORD',
-                hint: '••••••••',
+                hint: 'Enter your account password',
                 icon: Icons.lock_outline_rounded,
                 obscureText: _obscure,
                 onToggleObscure: () => setState(() => _obscure = !_obscure),

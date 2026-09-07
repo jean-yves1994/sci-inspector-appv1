@@ -64,7 +64,10 @@ void main() {
             requestOptions: options(),
             statusCode: 400,
             data: <String, dynamic>{
-              'message': <String>['email must be an email', 'password too short'],
+              'message': <String>[
+                'email must be an email',
+                'password too short'
+              ],
             },
           ),
         ),
