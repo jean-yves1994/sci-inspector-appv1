@@ -1,4 +1,7 @@
-/// Property type values the backend validates. Wire values are exact.
+import '../../../core/utils/json_read.dart';
+
+/// Property type values the backend validates. Wire values are exact and
+/// case-sensitive.
 enum PropertyType {
   residential('Residential'),
   commercial('Commercial'),
@@ -8,6 +11,7 @@ enum PropertyType {
   other('Other');
 
   const PropertyType(this.wire);
+
   final String wire;
   String get label => wire;
 
@@ -39,14 +43,12 @@ class PropertyInspectionSummary {
 
   factory PropertyInspectionSummary.fromJson(Map<String, dynamic> j) =>
       PropertyInspectionSummary(
-        id: j['id'] as String,
-        status: j['status'] as String? ?? '',
-        inspectionNumber: j['inspectionNumber'] as String?,
-        loanReference: j['loanReference'] as String?,
-        clientName: j['clientName'] as String?,
-        createdAt: j['createdAt'] is String
-            ? DateTime.tryParse(j['createdAt'] as String)
-            : null,
+        id: J.asString(j['id']) ?? '',
+        status: J.asString(j['status']) ?? '',
+        inspectionNumber: J.asString(j['inspectionNumber']),
+        loanReference: J.asString(j['loanReference']),
+        clientName: J.asString(j['clientName']),
+        createdAt: J.asDate(j['createdAt']),
       );
 }
 
@@ -64,6 +66,8 @@ class Property {
     this.sector,
     this.cell,
     this.villageStreet,
+    this.plotNumber,
+    this.titleNumber,
     this.latitude,
     this.longitude,
     this.createdAt,
@@ -77,71 +81,105 @@ class Property {
   final String ownerClientName;
   final String? branchId;
   final String? branchName;
+
+  // Administrative location hierarchy, most specific first.
   final String? province;
   final String? district;
   final String? sector;
   final String? cell;
   final String? villageStreet;
 
-  /// Legacy, read-only. Never collected during basic property creation.
+  /// Cadastral parcel number. Displayed to inspectors as "Plot number".
+  final String? plotNumber;
+
+  /// Land title reference. Displayed to inspectors as "UPI" — the Rwandan
+  /// Unique Parcel Identifier.
+  ///
+  /// The field name stays `titleNumber` throughout the model and API layer.
+  /// Only the UI label says UPI; renaming would break the backend contract.
+  final String? titleNumber;
+
+  /// Prisma `Decimal` columns, so these arrive as JSON **strings**
+  /// ("51.5077"). Read through [J.asDouble], which accepts either form —
+  /// casting with `as num?` throws.
   final double? latitude;
   final double? longitude;
 
   final DateTime? createdAt;
   final List<PropertyInspectionSummary> recentInspections;
 
+  /// "KG 11 Ave, Nyagatovu, Kimironko, Gasabo, Kigali"
+  ///
+  /// Source of truth for administrative-location formatting. Blank and null
+  /// parts are dropped, so a property with no `villageStreet` never renders
+  /// "KG 11 Ave, , Gasabo".
   String get locationSummary {
     final parts = <String?>[villageStreet, cell, sector, district, province]
-        .where((p) => p != null && p.trim().isNotEmpty)
+        .map((p) => p?.trim())
+        .where((p) => p != null && p.isNotEmpty)
         .cast<String>()
         .toList();
     return parts.isEmpty ? 'Location not recorded' : parts.join(', ');
   }
 
+  /// "Plot 1234 · UPI 1/03/07/04/1234", omitting whichever is absent.
+  ///
+  /// Used on the property list card, where a parcel is usually identified by
+  /// its registration reference rather than by its name. Returns an empty
+  /// string when neither is recorded — callers should guard with
+  /// [hasLandRegistration].
+  String get landRegistrationSummary {
+    final parts = <String>[
+      if (plotNumber?.trim().isNotEmpty ?? false) 'Plot ${plotNumber!.trim()}',
+      if (titleNumber?.trim().isNotEmpty ?? false) 'UPI ${titleNumber!.trim()}',
+    ];
+    return parts.join(' · ');
+  }
+
+  /// True when at least one land-registration reference is on file.
+  bool get hasLandRegistration =>
+      (plotNumber?.trim().isNotEmpty ?? false) ||
+      (titleNumber?.trim().isNotEmpty ?? false);
+
   bool get hasCoordinates => latitude != null && longitude != null;
 
   factory Property.fromJson(Map<String, dynamic> j) {
-    final insp = j['inspections'] ?? j['recentInspections'];
+    final inspections = j['inspections'] ?? j['recentInspections'];
+    final branch = J.asMap(j['branch']);
+
     return Property(
-      id: j['id'] as String,
-      reference: j['reference'] as String? ?? '',
-      name: j['name'] as String? ?? '',
-      propertyType: PropertyType.tryParse(j['propertyType'] as String?),
-      ownerClientName: j['ownerClientName'] as String? ?? '',
-      branchId: j['branchId'] as String?,
-      branchName: j['branch'] is Map<String, dynamic>
-          ? (j['branch'] as Map<String, dynamic>)['name'] as String?
-          : j['branchName'] as String?,
-      province: j['province'] as String?,
-      district: j['district'] as String?,
-      sector: j['sector'] as String?,
-      cell: j['cell'] as String?,
-      villageStreet: j['villageStreet'] as String?,
-      latitude: _d(j['latitude']),
-      longitude: _d(j['longitude']),
-      createdAt: j['createdAt'] is String
-          ? DateTime.tryParse(j['createdAt'] as String)
-          : null,
-      recentInspections: insp is List
-          ? insp
+      id: J.asString(j['id']) ?? '',
+      reference: J.asString(j['reference']) ?? '',
+      name: J.asString(j['name']) ?? '',
+      propertyType: PropertyType.tryParse(J.asString(j['propertyType'])),
+      ownerClientName: J.asString(j['ownerClientName']) ?? '',
+      branchId: J.asString(j['branchId']),
+      branchName: J.asString(branch?['name']) ?? J.asString(j['branchName']),
+      province: J.asString(j['province']),
+      district: J.asString(j['district']),
+      sector: J.asString(j['sector']),
+      cell: J.asString(j['cell']),
+      villageStreet: J.asString(j['villageStreet']),
+      plotNumber: J.asString(j['plotNumber']),
+      titleNumber: J.asString(j['titleNumber']),
+      latitude: J.asDouble(j['latitude']),
+      longitude: J.asDouble(j['longitude']),
+      createdAt: J.asDate(j['createdAt']),
+      recentInspections: inspections is List
+          ? inspections
               .whereType<Map<String, dynamic>>()
               .map(PropertyInspectionSummary.fromJson)
               .toList()
           : const <PropertyInspectionSummary>[],
     );
   }
-
-  static double? _d(Object? v) {
-    if (v is num) return v.toDouble();
-    if (v is String) return double.tryParse(v);
-    return null;
-  }
 }
 
-/// POST /properties body.
+/// Body for `POST /api/v1/properties`.
 ///
-/// The backend uses forbidNonWhitelisted:true, so nulls and client-only
-/// fields must never be serialised.
+/// Blank optional values are omitted rather than sent as empty strings. The
+/// backend trims and stores empty as null, so either would work — but the API
+/// runs `forbidNonWhitelisted: true`, and omitting is the safer habit.
 class CreatePropertyRequest {
   const CreatePropertyRequest({
     required this.name,
@@ -153,9 +191,13 @@ class CreatePropertyRequest {
     required this.cell,
     this.reference,
     this.villageStreet,
+    this.plotNumber,
+    this.titleNumber,
   });
 
+  /// Optional. Omitted, the backend generates PROP-YYYY-XXXX.
   final String? reference;
+
   final String name;
   final PropertyType propertyType;
   final String ownerClientName;
@@ -164,6 +206,8 @@ class CreatePropertyRequest {
   final String sector;
   final String cell;
   final String? villageStreet;
+  final String? plotNumber;
+  final String? titleNumber;
 
   Map<String, dynamic> toJson() {
     final j = <String, dynamic>{
@@ -175,13 +219,76 @@ class CreatePropertyRequest {
       'sector': sector.trim(),
       'cell': cell.trim(),
     };
-    void put(String k, String? v) {
-      final s = v?.trim();
-      if (s != null && s.isNotEmpty) j[k] = s;
+
+    void put(String key, String? value) {
+      final s = value?.trim();
+      if (s != null && s.isNotEmpty) j[key] = s;
     }
 
     put('reference', reference);
     put('villageStreet', villageStreet);
+    // Exact API names. Never plot_number, upi or title_number.
+    put('plotNumber', plotNumber);
+    put('titleNumber', titleNumber);
+
+    return j;
+  }
+}
+
+/// Body for `PATCH /api/v1/properties/:id`.
+///
+/// Distinguishes "leave unchanged" from "clear this value":
+///
+///   * a null field is omitted entirely — the server leaves it alone
+///   * an empty string is sent as `''`, which the backend stores as null
+///
+/// A `toJson` that dropped empty strings would make it impossible to clear a
+/// plot number once entered — the field would appear blank in the form while
+/// silently keeping its old value on the server.
+class UpdatePropertyRequest {
+  const UpdatePropertyRequest({
+    this.name,
+    this.propertyType,
+    this.ownerClientName,
+    this.province,
+    this.district,
+    this.sector,
+    this.cell,
+    this.villageStreet,
+    this.plotNumber,
+    this.titleNumber,
+  });
+
+  final String? name;
+  final PropertyType? propertyType;
+  final String? ownerClientName;
+  final String? province;
+  final String? district;
+  final String? sector;
+  final String? cell;
+  final String? villageStreet;
+  final String? plotNumber;
+  final String? titleNumber;
+
+  Map<String, dynamic> toJson() {
+    final j = <String, dynamic>{};
+
+    void put(String key, String? value) {
+      if (value == null) return; // not being changed
+      j[key] = value.trim(); // may be '' — the backend maps that to null
+    }
+
+    put('name', name);
+    if (propertyType != null) j['propertyType'] = propertyType!.wire;
+    put('ownerClientName', ownerClientName);
+    put('province', province);
+    put('district', district);
+    put('sector', sector);
+    put('cell', cell);
+    put('villageStreet', villageStreet);
+    put('plotNumber', plotNumber);
+    put('titleNumber', titleNumber);
+
     return j;
   }
 }

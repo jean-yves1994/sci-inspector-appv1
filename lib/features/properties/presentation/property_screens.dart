@@ -78,7 +78,7 @@ class _PropertyListScreenState extends ConsumerState<PropertyListScreen> {
               onChanged: ref.read(propertySearchProvider.notifier).onChanged,
               textInputAction: TextInputAction.search,
               decoration: InputDecoration(
-                hintText: 'Search reference, name, owner, location',
+                hintText: 'Search reference, name, owner, plot, UPI',
                 prefixIcon: const Icon(Icons.search_rounded, size: 20),
                 suffixIcon: ValueListenableBuilder<TextEditingValue>(
                   valueListenable: _search,
@@ -120,8 +120,7 @@ class _PropertyListScreenState extends ConsumerState<PropertyListScreen> {
                                       'inspection from the field.'
                                   : 'Try another search or register a new '
                                       'property.',
-                              actionLabel:
-                                  canCreate ? '+ New property' : null,
+                              actionLabel: canCreate ? '+ New property' : null,
                               onAction: canCreate
                                   ? () => context.push(Routes.propertyNew)
                                   : null,
@@ -131,8 +130,8 @@ class _PropertyListScreenState extends ConsumerState<PropertyListScreen> {
                       )
                     : ListView.separated(
                         controller: _scroll,
-                        padding: const EdgeInsets.fromLTRB(AppSpacing.md,
-                            AppSpacing.xs, AppSpacing.md, 120),
+                        padding: const EdgeInsets.fromLTRB(
+                            AppSpacing.md, AppSpacing.xs, AppSpacing.md, 120),
                         itemCount: state.items.length + 1,
                         separatorBuilder: (_, __) =>
                             const SizedBox(height: AppSpacing.sm),
@@ -163,6 +162,7 @@ class _PropertyListScreenState extends ConsumerState<PropertyListScreen> {
 
 class _PropertyCard extends StatelessWidget {
   const _PropertyCard({required this.property});
+
   final Property property;
 
   @override
@@ -234,8 +234,17 @@ class _PropertyCard extends StatelessWidget {
                           : property.ownerClientName,
                     ),
                     _Meta(
-                        icon: Icons.place_outlined,
-                        text: property.locationSummary),
+                      icon: Icons.place_outlined,
+                      text: property.locationSummary,
+                    ),
+                    // Land registration identifies a parcel in the field, so
+                    // it earns a line. Older records may predate the fields
+                    // being required, hence the guard.
+                    if (property.hasLandRegistration)
+                      _Meta(
+                        icon: Icons.confirmation_number_outlined,
+                        text: property.landRegistrationSummary,
+                      ),
                   ],
                 ),
               ),
@@ -251,6 +260,7 @@ class _PropertyCard extends StatelessWidget {
 
 class _Meta extends StatelessWidget {
   const _Meta({required this.icon, required this.text});
+
   final IconData icon;
   final String text;
 
@@ -267,8 +277,8 @@ class _Meta extends StatelessWidget {
               text,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                  fontSize: 12, color: AppColors.textSecondary),
+              style:
+                  const TextStyle(fontSize: 12, color: AppColors.textSecondary),
             ),
           ),
         ],
@@ -281,6 +291,7 @@ class _Meta extends StatelessWidget {
 
 class PropertyDetailScreen extends ConsumerWidget {
   const PropertyDetailScreen({required this.propertyId, super.key});
+
   final String propertyId;
 
   @override
@@ -315,10 +326,8 @@ class PropertyDetailScreen extends ConsumerWidget {
                             height: 48,
                             width: 48,
                             decoration: BoxDecoration(
-                              color:
-                                  AppColors.primary.withValues(alpha: 0.10),
-                              borderRadius:
-                                  BorderRadius.circular(AppRadius.md),
+                              color: AppColors.primary.withValues(alpha: 0.10),
+                              borderRadius: BorderRadius.circular(AppRadius.md),
                             ),
                             child: const Icon(Icons.apartment_rounded,
                                 color: AppColors.primary),
@@ -379,6 +388,11 @@ class PropertyDetailScreen extends ConsumerWidget {
                   ),
                 ),
               ),
+
+              // ---- Land registration ---------------------------------
+              // Directly below identification: the plot number and UPI ARE
+              // the parcel's legal identity, so they belong with the
+              // reference rather than at the foot of the screen.
               const SizedBox(height: AppSpacing.md),
               Card(
                 child: Padding(
@@ -386,26 +400,90 @@ class PropertyDetailScreen extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
-                      const Text('Details',
-                          style: TextStyle(
-                              fontSize: 15, fontWeight: FontWeight.w800)),
+                      const Text(
+                        'Land information',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
                       const SizedBox(height: AppSpacing.sm),
-                      _Row(label: 'Owner / client', value: p.ownerClientName),
+                      // Rows always render. Records created before these
+                      // became mandatory will show "Not recorded", which is
+                      // explicit — an absent row would be ambiguous in an
+                      // audit document.
+                      _Row(
+                        label: 'Plot number',
+                        value: p.plotNumber,
+                        emptyText: 'Not recorded',
+                      ),
+                      _Row(
+                        label: 'UPI',
+                        value: p.titleNumber,
+                        emptyText: 'Not recorded',
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // ---- Administrative location ---------------------------
+              const SizedBox(height: AppSpacing.md),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      const Text(
+                        'Administrative location',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      // The joined summary first, matching the report, then
+                      // each level for a reviewer who needs a specific one.
+                      _Row(label: 'Location', value: p.locationSummary),
+                      const Divider(height: AppSpacing.lg),
                       _Row(label: 'Province', value: p.province),
                       _Row(label: 'District', value: p.district),
                       _Row(label: 'Sector', value: p.sector),
                       _Row(label: 'Cell', value: p.cell),
                       _Row(label: 'Village / street', value: p.villageStreet),
+                    ],
+                  ),
+                ),
+              ),
+
+              // ---- Details -------------------------------------------
+              const SizedBox(height: AppSpacing.md),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      const Text(
+                        'Details',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      _Row(label: 'Owner / client', value: p.ownerClientName),
                       if (p.createdAt != null)
                         _Row(
                           label: 'Registered',
-                          value:
-                              DateFormat('d MMM yyyy').format(p.createdAt!),
+                          value: DateFormat('d MMM yyyy').format(p.createdAt!),
                         ),
                     ],
                   ),
                 ),
               ),
+
               const SizedBox(height: AppSpacing.md),
               const Padding(
                 padding: EdgeInsets.only(
@@ -439,8 +517,7 @@ class PropertyDetailScreen extends ConsumerWidget {
                       ].where((s) => s != null && s.isNotEmpty).join(' · '),
                       icon: Icons.assignment_outlined,
                       color: AppColors.primary,
-                      onTap: () =>
-                          context.push(Routes.inspectionDetail(i.id)),
+                      onTap: () => context.push(Routes.inspectionDetail(i.id)),
                       trailing: StatusBadge(
                         label: InspectionStatusX.parse(i.status).label,
                         color: InspectionStatusX.parse(i.status).color,
@@ -470,12 +547,27 @@ class PropertyDetailScreen extends ConsumerWidget {
 }
 
 class _Row extends StatelessWidget {
-  const _Row({required this.label, required this.value});
+  const _Row({
+    required this.label,
+    required this.value,
+    this.emptyText = '—',
+  });
+
   final String label;
   final String? value;
 
+  /// Shown when the value is null or blank.
+  ///
+  /// Defaults to an em-dash, but land-registration rows pass "Not recorded"
+  /// so the app matches the generated report — in an audit document, an
+  /// em-dash is ambiguous between "no value" and "not applicable".
+  final String emptyText;
+
   @override
   Widget build(BuildContext context) {
+    final isEmpty = value == null || value!.trim().isEmpty;
+    final display = isEmpty ? emptyText : value!;
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
@@ -494,9 +586,16 @@ class _Row extends StatelessWidget {
           ),
           Expanded(
             child: Text(
-              (value == null || value!.trim().isEmpty) ? '—' : value!,
-              style: const TextStyle(
-                  fontSize: 13.5, fontWeight: FontWeight.w600),
+              display,
+              style: TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
+                // A missing value reads as secondary, so a filled field is
+                // scannable at a glance in the field.
+                color: isEmpty
+                    ? AppColors.textSecondary.withValues(alpha: 0.8)
+                    : AppColors.textPrimary,
+              ),
             ),
           ),
         ],
@@ -525,6 +624,8 @@ class _CreatePropertyScreenState extends ConsumerState<CreatePropertyScreen> {
   final _sector = TextEditingController();
   final _cell = TextEditingController();
   final _village = TextEditingController();
+  final _plotNumber = TextEditingController();
+  final _titleNumber = TextEditingController();
 
   PropertyType? _type;
   bool _busy = false;
@@ -533,7 +634,16 @@ class _CreatePropertyScreenState extends ConsumerState<CreatePropertyScreen> {
   @override
   void dispose() {
     for (final c in <TextEditingController>[
-      _reference, _name, _owner, _province, _district, _sector, _cell, _village
+      _reference,
+      _name,
+      _owner,
+      _province,
+      _district,
+      _sector,
+      _cell,
+      _village,
+      _plotNumber,
+      _titleNumber,
     ]) {
       c.dispose();
     }
@@ -550,20 +660,24 @@ class _CreatePropertyScreenState extends ConsumerState<CreatePropertyScreen> {
     });
 
     try {
-      final property =
-          await ref.read(propertiesRepositoryProvider).create(
-                CreatePropertyRequest(
-                  reference: _reference.text,
-                  name: _name.text,
-                  propertyType: _type!,
-                  ownerClientName: _owner.text,
-                  province: _province.text,
-                  district: _district.text,
-                  sector: _sector.text,
-                  cell: _cell.text,
-                  villageStreet: _village.text,
-                ),
-              );
+      // The repository returns the SERVER's property, so `reference`,
+      // `plotNumber` and `titleNumber` are all present. Never construct a
+      // local Property from these form fields — it would silently drop them.
+      final property = await ref.read(propertiesRepositoryProvider).create(
+            CreatePropertyRequest(
+              reference: _reference.text,
+              name: _name.text,
+              propertyType: _type!,
+              ownerClientName: _owner.text,
+              province: _province.text,
+              district: _district.text,
+              sector: _sector.text,
+              cell: _cell.text,
+              villageStreet: _village.text,
+              plotNumber: _plotNumber.text,
+              titleNumber: _titleNumber.text,
+            ),
+          );
 
       ref.read(propertyListProvider.notifier).prepend(property);
       if (!mounted) return;
@@ -589,6 +703,7 @@ class _CreatePropertyScreenState extends ConsumerState<CreatePropertyScreen> {
         child: ListView(
           padding: const EdgeInsets.all(AppSpacing.md),
           children: <Widget>[
+            // ---- Identification ------------------------------------
             const SectionLabel('Identification'),
             SciTextField(
               controller: _reference,
@@ -632,8 +747,7 @@ class _CreatePropertyScreenState extends ConsumerState<CreatePropertyScreen> {
                       DropdownMenuItem<PropertyType>(
                           value: t, child: Text(t.label)),
                   ],
-                  onChanged:
-                      _busy ? null : (v) => setState(() => _type = v),
+                  onChanged: _busy ? null : (v) => setState(() => _type = v),
                   validator: (v) =>
                       v == null ? 'Property type is required' : null,
                 ),
@@ -646,9 +760,36 @@ class _CreatePropertyScreenState extends ConsumerState<CreatePropertyScreen> {
               hint: 'John Doe',
               icon: Icons.person_outline_rounded,
               enabled: !_busy,
-              validator:
-                  Validators.required('Owner / client name is required'),
+              validator: Validators.required('Owner / client name is required'),
             ),
+
+            // ---- Land registration ---------------------------------
+            // Placed immediately after Identification: the plot number and
+            // UPI are the parcel's legal identity, and both are mandatory.
+            const SizedBox(height: AppSpacing.xl),
+            const SectionLabel('Land information'),
+            SciTextField(
+              controller: _plotNumber,
+              label: 'PLOT NUMBER',
+              hint: 'Enter plot number',
+              icon: Icons.crop_square_rounded,
+              enabled: !_busy,
+              textInputAction: TextInputAction.next,
+              validator: Validators.required('Plot number is required'),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            SciTextField(
+              controller: _titleNumber,
+              label: 'UPI',
+              hint: 'Enter Unique Parcel Identifier',
+              icon: Icons.confirmation_number_outlined,
+              enabled: !_busy,
+              textInputAction: TextInputAction.next,
+              validator: Validators.required('UPI is required'),
+              helper: 'Unique Parcel Identifier from the land title.',
+            ),
+
+            // ---- Location ------------------------------------------
             const SizedBox(height: AppSpacing.xl),
             const SectionLabel('Location'),
             SciTextField(
@@ -695,6 +836,7 @@ class _CreatePropertyScreenState extends ConsumerState<CreatePropertyScreen> {
               enabled: !_busy,
               textInputAction: TextInputAction.done,
             ),
+
             if (_error != null) ...<Widget>[
               const SizedBox(height: AppSpacing.md),
               MessageBanner(message: _error!),

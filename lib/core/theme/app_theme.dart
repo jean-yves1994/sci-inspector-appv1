@@ -35,13 +35,24 @@ class AppColors {
 
 class AppSpacing {
   const AppSpacing._();
-  static const double xxs = 4, xs = 8, sm = 12, md = 16, lg = 20, xl = 24,
-      xxl = 32, xxxl = 40, touchTarget = 48;
+  static const double xxs = 4,
+      xs = 8,
+      sm = 12,
+      md = 16,
+      lg = 20,
+      xl = 24,
+      xxl = 32,
+      xxxl = 40,
+      touchTarget = 48;
 }
 
 class AppRadius {
   const AppRadius._();
-  static const double sm = 10, md = 14, lg = 16, xl = 20, xxl = 24,
+  static const double sm = 10,
+      md = 14,
+      lg = 16,
+      xl = 20,
+      xxl = 24,
       authCard = 32;
 }
 
@@ -116,10 +127,9 @@ class AppTheme {
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           minimumSize: const Size.fromHeight(54),
-          textStyle:
-              const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
           shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppRadius.xxl)),
+              borderRadius: BorderRadius.circular(AppRadius.sm)),
         ),
       ),
       textButtonTheme: TextButtonThemeData(

@@ -88,33 +88,40 @@ class _AuthScaffoldState extends State<AuthScaffold>
             colors: AppColors.authHeroGradient,
           ),
         ),
-        child: SafeArea(
-          bottom: false,
-          child: Column(
-            children: <Widget>[
-              // Hero collapses when the keyboard opens so the form keeps room.
-              AnimatedSize(
-                duration: const Duration(milliseconds: 220),
-                curve: Curves.easeOut,
-                child: isKeyboardOpen
-                    ? const SizedBox(height: AppSpacing.sm)
-                    : FadeTransition(
-                        opacity: _fade,
-                        child: _Hero(
-                          title: widget.title,
-                          subtitle: widget.subtitle,
-                          onBack: widget.onBack,
-                        ),
-                      ),
+        child: Stack(
+          children: <Widget>[
+            // Hero sits behind the card, top-aligned inside the safe area.
+            SafeArea(
+              bottom: false,
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 200),
+                opacity: isKeyboardOpen ? 0 : 1,
+                child: FadeTransition(
+                  opacity: _fade,
+                  child: _Hero(
+                    title: widget.title,
+                    subtitle: widget.subtitle,
+                    onBack: widget.onBack,
+                  ),
+                ),
               ),
+            ),
 
-              Expanded(
+            // Card pinned to the bottom, occupying a fixed share of the
+            // screen. Expanded previously let it consume ALL remaining space,
+            // which is why the form floated in a tall, mostly empty panel.
+            Align(
+              alignment: Alignment.bottomCenter,
+              child: FractionallySizedBox(
+                // 60% normally; grows when the keyboard is up so the fields
+                // and button stay reachable.
+                heightFactor: isKeyboardOpen ? 0.92 : 0.65,
+                widthFactor: 1,
                 child: SlideTransition(
                   position: _slide,
                   child: FadeTransition(
                     opacity: _fade,
                     child: Container(
-                      width: double.infinity,
                       decoration: const BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.vertical(
@@ -133,7 +140,7 @@ class _AuthScaffoldState extends State<AuthScaffold>
                               child: Padding(
                                 padding: EdgeInsets.fromLTRB(
                                   AppSpacing.xl,
-                                  AppSpacing.xxl,
+                                  AppSpacing.xl,
                                   AppSpacing.xl,
                                   AppSpacing.lg +
                                       MediaQuery.paddingOf(context).bottom,
@@ -142,18 +149,17 @@ class _AuthScaffoldState extends State<AuthScaffold>
                                   crossAxisAlignment:
                                       CrossAxisAlignment.stretch,
                                   children: <Widget>[
+                                    // Two spacers around the form centre it
+                                    // in the space above the footer, rather
+                                    // than pinning it to the top with a void
+                                    // beneath.
+                                    const Spacer(flex: 2),
+
                                     widget.child,
 
-                                    // Pushes the footer down instead of
-                                    // leaving dead space at the bottom.
-                                    const Spacer(),
-
-                                    if (AppConfig.isInsecureWebSession) ...[
-                                      const SizedBox(height: AppSpacing.md),
-                                    ],
-
+                                    const Spacer(flex: 3),
                                     if (widget.footer != null) ...[
-                                      const SizedBox(height: AppSpacing.lg),
+                                      const SizedBox(height: AppSpacing.md),
                                       widget.footer!,
                                     ],
                                   ],
@@ -167,8 +173,8 @@ class _AuthScaffoldState extends State<AuthScaffold>
                   ),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -186,10 +192,10 @@ class _Hero extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(
-        AppSpacing.xl,
-        AppSpacing.xs,
-        AppSpacing.xl,
-        AppSpacing.xl,
+        AppSpacing.xl, // left  24
+        AppSpacing.xxxl, // top   24  <-- clears the notch / status bar
+        AppSpacing.xl, // right 24
+        AppSpacing.xl, // bottom 24
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -244,7 +250,8 @@ class _Hero extends StatelessWidget {
             ],
           ),
 
-          const SizedBox(height: AppSpacing.lg),
+          const SizedBox(height: AppSpacing.xxxl),
+          const SizedBox(height: AppSpacing.xxxl),
           Text(
             title,
             style: const TextStyle(
