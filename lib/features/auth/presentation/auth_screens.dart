@@ -11,20 +11,39 @@ import '../../../core/widgets/sci_widgets.dart';
 import '../application/session_controller.dart';
 import '../data/auth_repository.dart';
 
-/// Shared auth layout: deep-blue gradient hero with a white rounded card
-/// sliding up over it. Matches the login UI reference — no social login.
+// ===========================================================================
+// Shared layout
+// ===========================================================================
+
+/// Shared layout for the authentication screens.
+///
+/// The previous version placed the form in a bare `SingleChildScrollView`.
+/// A scroll view sizes to its CONTENT, so on a tall screen the form bunched
+/// at the top and left a large void beneath it.
+///
+/// This uses `LayoutBuilder` + `ConstrainedBox(minHeight)` + `IntrinsicHeight`
+/// so the column always fills the card. That is what lets `Spacer()` work —
+/// the form sits at the top, the footer pins to the bottom, and the space
+/// distributes between them. It still scrolls when the keyboard opens.
 class AuthScaffold extends StatefulWidget {
   const AuthScaffold({
     required this.title,
     required this.subtitle,
     required this.child,
+    this.footer,
     this.onBack,
     super.key,
   });
 
   final String title;
   final String subtitle;
+
+  /// Main form content, in the upper portion of the card.
   final Widget child;
+
+  /// Pinned to the bottom of the card, above the safe-area inset.
+  final Widget? footer;
+
   final VoidCallback? onBack;
 
   @override
@@ -33,27 +52,34 @@ class AuthScaffold extends StatefulWidget {
 
 class _AuthScaffoldState extends State<AuthScaffold>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
+  late final AnimationController _controller = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 400),
+    duration: const Duration(milliseconds: 450),
   )..forward();
 
-  late final Animation<Offset> _slide =
-      Tween<Offset>(begin: const Offset(0, 0.06), end: Offset.zero)
-          .animate(CurvedAnimation(parent: _c, curve: Curves.easeOutCubic));
+  late final Animation<Offset> _slide = Tween<Offset>(
+    begin: const Offset(0, 0.05),
+    end: Offset.zero,
+  ).animate(
+    CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
+  );
 
   late final Animation<double> _fade =
-      CurvedAnimation(parent: _c, curve: Curves.easeOut);
+      CurvedAnimation(parent: _controller, curve: Curves.easeOut);
 
   @override
   void dispose() {
-    _c.dispose();
+    _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+    final isKeyboardOpen = keyboardInset > 0;
+
     return Scaffold(
+      backgroundColor: AppColors.primary,
       body: DecoratedBox(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -66,50 +92,22 @@ class _AuthScaffoldState extends State<AuthScaffold>
           bottom: false,
           child: Column(
             children: <Widget>[
-              FadeTransition(
-                opacity: _fade,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.xl,
-                    AppSpacing.xs,
-                    AppSpacing.xl,
-                    AppSpacing.lg,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      if (widget.onBack != null)
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: IconButton(
-                            onPressed: widget.onBack,
-                            icon: const Icon(Icons.arrow_back_rounded),
-                            color: Colors.white,
-                            tooltip: 'Back',
-                          ),
-                        ),
-                      Text(
-                        widget.title,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 29,
-                          fontWeight: FontWeight.w800,
-                          height: 1.15,
+              // Hero collapses when the keyboard opens so the form keeps room.
+              AnimatedSize(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOut,
+                child: isKeyboardOpen
+                    ? const SizedBox(height: AppSpacing.sm)
+                    : FadeTransition(
+                        opacity: _fade,
+                        child: _Hero(
+                          title: widget.title,
+                          subtitle: widget.subtitle,
+                          onBack: widget.onBack,
                         ),
                       ),
-                      const SizedBox(height: AppSpacing.xs),
-                      Text(
-                        widget.subtitle,
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.82),
-                          fontSize: 14.5,
-                          height: 1.35,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
               ),
+
               Expanded(
                 child: SlideTransition(
                   position: _slide,
@@ -123,29 +121,46 @@ class _AuthScaffoldState extends State<AuthScaffold>
                           top: Radius.circular(AppRadius.authCard),
                         ),
                       ),
-                      child: SingleChildScrollView(
-                        padding: EdgeInsets.fromLTRB(
-                          AppSpacing.xl,
-                          AppSpacing.xxl,
-                          AppSpacing.xl,
-                          AppSpacing.xl +
-                              MediaQuery.viewInsetsOf(context).bottom,
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: <Widget>[
-                            widget.child,
-                            if (AppConfig.isInsecureWebSession) ...<Widget>[
-                              const SizedBox(height: AppSpacing.lg),
-                              const MessageBanner(
-                                message:
-                                    'Development web session. Tokens are held '
-                                    'in memory only and clear on reload.',
-                                color: AppColors.warning,
-                                icon: Icons.info_outline_rounded,
+                      child: LayoutBuilder(
+                        builder: (context, constraints) =>
+                            SingleChildScrollView(
+                          padding: EdgeInsets.only(bottom: keyboardInset),
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              minHeight: constraints.maxHeight,
+                            ),
+                            child: IntrinsicHeight(
+                              child: Padding(
+                                padding: EdgeInsets.fromLTRB(
+                                  AppSpacing.xl,
+                                  AppSpacing.xxl,
+                                  AppSpacing.xl,
+                                  AppSpacing.lg +
+                                      MediaQuery.paddingOf(context).bottom,
+                                ),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: <Widget>[
+                                    widget.child,
+
+                                    // Pushes the footer down instead of
+                                    // leaving dead space at the bottom.
+                                    const Spacer(),
+
+                                    if (AppConfig.isInsecureWebSession) ...[
+                                      const SizedBox(height: AppSpacing.md),
+                                    ],
+
+                                    if (widget.footer != null) ...[
+                                      const SizedBox(height: AppSpacing.lg),
+                                      widget.footer!,
+                                    ],
+                                  ],
+                                ),
                               ),
-                            ],
-                          ],
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -160,7 +175,160 @@ class _AuthScaffoldState extends State<AuthScaffold>
   }
 }
 
-// ---------------------------------------------------------------- login
+class _Hero extends StatelessWidget {
+  const _Hero({required this.title, required this.subtitle, this.onBack});
+
+  final String title;
+  final String subtitle;
+  final VoidCallback? onBack;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.xl,
+        AppSpacing.xs,
+        AppSpacing.xl,
+        AppSpacing.xl,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          if (onBack != null)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: IconButton(
+                onPressed: onBack,
+                icon: const Icon(Icons.arrow_back_rounded),
+                color: Colors.white,
+                tooltip: 'Back',
+                padding: EdgeInsets.zero,
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+
+          // Brand mark. The auth screens were the only place in the app with
+          // no SCI identity, which is an odd gap on the screen that carries
+          // the most trust weight.
+          Row(
+            children: <Widget>[
+              Container(
+                height: 44,
+                width: 44,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                alignment: Alignment.center,
+                child: const Text(
+                  'SCI',
+                  style: TextStyle(
+                    color: AppColors.primary,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  'Smart Collateral Inspection',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.92),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: AppSpacing.lg),
+          Text(
+            title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 28,
+              fontWeight: FontWeight.w800,
+              height: 1.15,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xxs),
+          Text(
+            subtitle,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.80),
+              fontSize: 14,
+              height: 1.35,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Quiet informational note for the card footer.
+///
+/// The "accounts are issued by your administrator" line previously sat in a
+/// warning-orange `MessageBanner`, which reads as an error. It is neutral
+/// information, so it is styled as a footnote.
+class _FooterNote extends StatelessWidget {
+  const _FooterNote(this.message);
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: <Widget>[
+        Container(
+          padding: const EdgeInsets.all(AppSpacing.sm),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              const Icon(
+                Icons.info_outline_rounded,
+                size: 16,
+                color: AppColors.textSecondary,
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              Expanded(
+                child: Text(
+                  message,
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    height: 1.35,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Text(
+          'Smart Collateral Inspection',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textSecondary.withValues(alpha: 0.7),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ===========================================================================
+// Login
+// ===========================================================================
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -173,6 +341,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _email = TextEditingController();
   final _password = TextEditingController();
+  final _passwordFocus = FocusNode();
+
   bool _obscure = true;
   bool _busy = false;
   String? _error;
@@ -181,6 +351,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   void dispose() {
     _email.dispose();
     _password.dispose();
+    _passwordFocus.dispose();
     super.dispose();
   }
 
@@ -192,11 +363,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       _busy = true;
       _error = null;
     });
+
     try {
       await ref
           .read(sessionControllerProvider.notifier)
           .login(email: _email.text, password: _password.text);
-      // Router redirect handles navigation.
+      // Navigation is handled by the router redirect.
     } on ApiError catch (e) {
       if (mounted) setState(() => _error = e.message);
     } finally {
@@ -206,12 +378,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Surface an involuntary sign-out reason, e.g. a revoked session.
     final session = ref.watch(sessionControllerProvider);
     final reason = session is SessionUnauthenticated ? session.reason : null;
 
     return AuthScaffold(
       title: 'Welcome back',
       subtitle: 'Sign in to continue your field inspections.',
+      footer: const _FooterNote(
+        'Inspector accounts are issued by your organisation administrator.',
+      ),
       child: Form(
         key: _formKey,
         child: AutofillGroup(
@@ -237,10 +413,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 enabled: !_busy,
                 autofillHints: const <String>[AutofillHints.username],
                 validator: Validators.email,
+                onFieldSubmitted: (_) => _passwordFocus.requestFocus(),
               ),
               const SizedBox(height: AppSpacing.md),
               SciTextField(
                 controller: _password,
+                focusNode: _passwordFocus,
                 label: 'PASSWORD',
                 hint: 'Enter your account password',
                 icon: Icons.lock_outline_rounded,
@@ -257,28 +435,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 child: TextButton(
                   onPressed:
                       _busy ? null : () => context.push(Routes.forgotPassword),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.xs,
+                      vertical: AppSpacing.xs,
+                    ),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
                   child: const Text('Forgot password?'),
                 ),
               ),
               if (_error != null || reason != null) ...<Widget>[
-                const SizedBox(height: AppSpacing.xs),
+                const SizedBox(height: AppSpacing.sm),
                 MessageBanner(message: _error ?? reason!),
               ],
-              const SizedBox(height: AppSpacing.md),
+              const SizedBox(height: AppSpacing.lg),
               FilledButton(
                 onPressed: _busy ? null : _submit,
                 child: _busy ? const ButtonSpinner() : const Text('Sign in'),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              const Text(
-                'Inspector accounts are issued by your organisation '
-                'administrator.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textSecondary,
-                  height: 1.4,
-                ),
               ),
             ],
           ),
@@ -288,7 +463,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 }
 
-// ------------------------------------------------------- forgot password
+// ===========================================================================
+// Forgot password
+// ===========================================================================
 
 class ForgotPasswordScreen extends ConsumerStatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -301,6 +478,7 @@ class ForgotPasswordScreen extends ConsumerStatefulWidget {
 class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
   final _email = TextEditingController();
+
   bool _busy = false;
   bool _sent = false;
   String? _error;
@@ -312,11 +490,14 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   }
 
   Future<void> _submit() async {
+    FocusScope.of(context).unfocus();
     if (!(_formKey.currentState?.validate() ?? false)) return;
+
     setState(() {
       _busy = true;
       _error = null;
     });
+
     try {
       await ref.read(authRepositoryProvider).forgotPassword(_email.text);
       if (mounted) setState(() => _sent = true);
@@ -333,70 +514,86 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
       title: 'Reset password',
       subtitle: 'We will send a reset link to your registered email.',
       onBack: () => context.pop(),
-      child: _sent
-          ? Column(
-              children: <Widget>[
-                const Icon(Icons.mark_email_read_outlined,
-                    size: 46, color: AppColors.success),
-                const SizedBox(height: AppSpacing.md),
-                const Text(
-                  'Check your email',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  'If an account exists for ${_email.text.trim()}, a reset '
-                  'link has been sent.',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: AppColors.textSecondary,
-                    height: 1.4,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.xl),
-                FilledButton(
-                  onPressed: () => context.go(Routes.login),
-                  child: const Text('Back to sign in'),
-                ),
-              ],
-            )
-          : Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: <Widget>[
-                  SciTextField(
-                    controller: _email,
-                    label: 'EMAIL',
-                    hint: 'inspector@sci.rw',
-                    icon: Icons.alternate_email_rounded,
-                    keyboardType: TextInputType.emailAddress,
-                    enabled: !_busy,
-                    validator: Validators.email,
-                  ),
-                  if (_error != null) ...<Widget>[
-                    const SizedBox(height: AppSpacing.sm),
-                    MessageBanner(message: _error!),
-                  ],
-                  const SizedBox(height: AppSpacing.lg),
-                  FilledButton(
-                    onPressed: _busy ? null : _submit,
-                    child: _busy
-                        ? const ButtonSpinner()
-                        : const Text('Send reset link'),
-                  ),
-                ],
-              ),
-            ),
+      child: _sent ? _sentState(context) : _formState(),
+    );
+  }
+
+  Widget _formState() {
+    return Form(
+      key: _formKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          SciTextField(
+            controller: _email,
+            label: 'EMAIL',
+            hint: 'Enter your account email',
+            icon: Icons.alternate_email_rounded,
+            keyboardType: TextInputType.emailAddress,
+            textInputAction: TextInputAction.done,
+            enabled: !_busy,
+            validator: Validators.email,
+            onFieldSubmitted: (_) => _submit(),
+          ),
+          if (_error != null) ...<Widget>[
+            const SizedBox(height: AppSpacing.sm),
+            MessageBanner(message: _error!),
+          ],
+          const SizedBox(height: AppSpacing.lg),
+          FilledButton(
+            onPressed: _busy ? null : _submit,
+            child:
+                _busy ? const ButtonSpinner() : const Text('Send reset link'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _sentState(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        const Icon(
+          Icons.mark_email_read_outlined,
+          size: 46,
+          color: AppColors.success,
+        ),
+        const SizedBox(height: AppSpacing.md),
+        const Text(
+          'Check your email',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          'If an account exists for ${_email.text.trim()}, a reset link has '
+          'been sent.',
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 13,
+            color: AppColors.textSecondary,
+            height: 1.4,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xl),
+        FilledButton(
+          onPressed: () => context.go(Routes.login),
+          child: const Text('Back to sign in'),
+        ),
+      ],
     );
   }
 }
 
-// -------------------------------------------------------- reset password
+// ===========================================================================
+// Reset password
+// ===========================================================================
 
 class ResetPasswordScreen extends ConsumerStatefulWidget {
   const ResetPasswordScreen({this.token, super.key});
+
+  /// Supplied via deep link: /reset-password?token=...
   final String? token;
 
   @override
@@ -410,6 +607,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
       TextEditingController(text: widget.token ?? '');
   final _password = TextEditingController();
   final _confirm = TextEditingController();
+
   bool _obscure = true;
   bool _busy = false;
   String? _error;
@@ -423,11 +621,14 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
   }
 
   Future<void> _submit() async {
+    FocusScope.of(context).unfocus();
     if (!(_formKey.currentState?.validate() ?? false)) return;
+
     setState(() {
       _busy = true;
       _error = null;
     });
+
     try {
       await ref.read(authRepositoryProvider).resetPassword(
             token: _token.text.trim(),
@@ -481,7 +682,9 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
               obscureText: _obscure,
               enabled: !_busy,
               validator: Validators.matches(
-                  () => _password.text, 'Passwords do not match'),
+                () => _password.text,
+                'Passwords do not match',
+              ),
             ),
             if (_error != null) ...<Widget>[
               const SizedBox(height: AppSpacing.sm),
@@ -500,7 +703,9 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
   }
 }
 
-// ------------------------------------------------------- change password
+// ===========================================================================
+// Change password
+// ===========================================================================
 
 class ChangePasswordScreen extends ConsumerStatefulWidget {
   const ChangePasswordScreen({super.key});
@@ -515,6 +720,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
   final _current = TextEditingController();
   final _next = TextEditingController();
   final _confirm = TextEditingController();
+
   bool _obscure = true;
   bool _busy = false;
   String? _error;
@@ -528,11 +734,14 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
   }
 
   Future<void> _submit() async {
+    FocusScope.of(context).unfocus();
     if (!(_formKey.currentState?.validate() ?? false)) return;
+
     setState(() {
       _busy = true;
       _error = null;
     });
+
     try {
       await ref.read(sessionControllerProvider.notifier).changePassword(
             currentPassword: _current.text,
@@ -558,7 +767,17 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
       subtitle: forced
           ? 'Your organisation requires a new password before you continue.'
           : 'Choose a new password for your SCI account.',
+      // No back button when the change is mandatory — the router redirect
+      // would bounce straight back anyway.
       onBack: forced ? null : () => context.pop(),
+      footer: forced
+          ? TextButton(
+              onPressed: _busy
+                  ? null
+                  : () => ref.read(sessionControllerProvider.notifier).logout(),
+              child: const Text('Sign out instead'),
+            )
+          : null,
       child: Form(
         key: _formKey,
         child: Column(
@@ -590,7 +809,9 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
               obscureText: _obscure,
               enabled: !_busy,
               validator: Validators.matches(
-                  () => _next.text, 'Passwords do not match'),
+                () => _next.text,
+                'Passwords do not match',
+              ),
             ),
             if (_error != null) ...<Widget>[
               const SizedBox(height: AppSpacing.sm),
@@ -602,16 +823,6 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
               child:
                   _busy ? const ButtonSpinner() : const Text('Update password'),
             ),
-            if (forced) ...<Widget>[
-              const SizedBox(height: AppSpacing.xs),
-              TextButton(
-                onPressed: _busy
-                    ? null
-                    : () =>
-                        ref.read(sessionControllerProvider.notifier).logout(),
-                child: const Text('Sign out instead'),
-              ),
-            ],
           ],
         ),
       ),

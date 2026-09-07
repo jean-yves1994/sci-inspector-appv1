@@ -175,16 +175,8 @@ class _WebSessionNotice extends StatelessWidget {
       child: const Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Icon(Icons.info_outline_rounded,
-              size: 18, color: AppColors.warning),
+          Icon(Icons.info_outline_rounded, size: 18, color: AppColors.warning),
           SizedBox(width: AppSpacing.xs),
-          Expanded(
-            child: Text(
-              'Development web session. Tokens are held in memory only and '
-              'are cleared on reload.',
-              style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
-            ),
-          ),
         ],
       ),
     );

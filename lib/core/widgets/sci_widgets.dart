@@ -1,11 +1,12 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../network/api_error.dart';
 import '../theme/app_theme.dart';
 
-/// Pill severity badge — cybersecurity UI reference. Never shows raw enums.
+/// Pill severity badge. Never renders a raw enum value.
 class StatusBadge extends StatelessWidget {
   const StatusBadge({
     required this.label,
@@ -49,7 +50,7 @@ class StatusBadge extends StatelessWidget {
   }
 }
 
-/// 2x2 dashboard stat card.
+/// Dashboard stat card.
 class StatCard extends StatelessWidget {
   const StatCard({
     required this.label,
@@ -113,7 +114,7 @@ class StatCard extends StatelessWidget {
   }
 }
 
-/// Alert-style tile — reused for requirements, notifications, history.
+/// Alert-style tile — requirements, notifications, history.
 class AlertTile extends StatelessWidget {
   const AlertTile({
     required this.title,
@@ -201,8 +202,7 @@ class EmptyState extends StatelessWidget {
             Text(
               title,
               textAlign: TextAlign.center,
-              style:
-                  const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: AppSpacing.xxs),
             Text(
@@ -216,7 +216,10 @@ class EmptyState extends StatelessWidget {
             ),
             if (actionLabel != null) ...<Widget>[
               const SizedBox(height: AppSpacing.lg),
-              FilledButton.tonal(onPressed: onAction, child: Text(actionLabel!)),
+              FilledButton.tonal(
+                onPressed: onAction,
+                child: Text(actionLabel!),
+              ),
             ],
           ],
         ),
@@ -225,8 +228,12 @@ class EmptyState extends StatelessWidget {
   }
 }
 
-/// Distinguishes offline from server failure so the inspector knows whether
+/// Distinguishes offline from server failure, so the inspector knows whether
 /// to move location or simply wait.
+///
+/// In debug builds a non-[ApiError] shows its runtime type and message: a bare
+/// "Please try again" hides parse errors, which is what made several bugs in
+/// this app hard to identify.
 class ErrorStateView extends StatelessWidget {
   const ErrorStateView({
     required this.error,
@@ -256,12 +263,14 @@ class ErrorStateView extends StatelessWidget {
             const SizedBox(height: AppSpacing.md),
             Text(
               offline ? 'No connection' : 'Something went wrong',
-              style:
-                  const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: AppSpacing.xxs),
             Text(
-              api?.message ?? 'Please try again.',
+              api?.message ??
+                  (kDebugMode
+                      ? '${error.runtimeType}: $error'
+                      : 'Please try again.'),
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontSize: 13,
@@ -309,8 +318,7 @@ class ListSkeleton extends StatelessWidget {
   }
 }
 
-/// Circular arc gauge from the cybersecurity reference, reused as the
-/// inspection completeness gauge.
+/// Circular arc gauge, reused as the inspection completeness indicator.
 class ProgressGauge extends StatelessWidget {
   const ProgressGauge({
     required this.percentage,
@@ -434,11 +442,12 @@ class _GaugePainter extends CustomPainter {
       old.progress != progress || old.color != color;
 }
 
-/// Soft-filled labelled text field used across auth and forms.
+/// Soft-filled labelled text field used across auth and the inspection forms.
 class SciTextField extends StatelessWidget {
   const SciTextField({
     required this.controller,
     required this.label,
+    this.focusNode,
     this.icon,
     this.hint,
     this.keyboardType,
@@ -457,6 +466,11 @@ class SciTextField extends StatelessWidget {
 
   final TextEditingController controller;
   final String label;
+
+  /// Lets a caller move focus between fields — the login screen sends the
+  /// user from Email to Password on Next.
+  final FocusNode? focusNode;
+
   final IconData? icon;
   final String? hint;
   final TextInputType? keyboardType;
@@ -488,6 +502,7 @@ class SciTextField extends StatelessWidget {
         const SizedBox(height: AppSpacing.xs),
         TextFormField(
           controller: controller,
+          focusNode: focusNode,
           keyboardType: keyboardType,
           obscureText: obscureText,
           validator: validator,
@@ -577,6 +592,7 @@ class MessageBanner extends StatelessWidget {
 
 class SectionLabel extends StatelessWidget {
   const SectionLabel(this.text, {super.key});
+
   final String text;
 
   @override

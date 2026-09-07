@@ -4,15 +4,16 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/router/routes.dart';
 import '../../../core/network/api_error.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_spacing.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/validators.dart';
+import '../../../core/widgets/sci_widgets.dart';
 import '../application/session_controller.dart';
-import 'widgets/auth_scaffold.dart';
-import 'widgets/sci_text_field.dart';
+import 'auth_scaffold.dart';
 
-/// Login screen matching the specified UI reference — gradient hero, slide-up
-/// white card, pill primary button — explicitly WITHOUT social login.
+/// Sign-in screen.
+///
+/// No social login, per the design brief — inspector accounts are provisioned
+/// by an administrator.
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
@@ -24,15 +25,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _email = TextEditingController();
   final _password = TextEditingController();
+  final _passwordFocus = FocusNode();
 
   bool _obscure = true;
-  bool _submitting = false;
+  bool _busy = false;
   String? _error;
 
   @override
   void dispose() {
     _email.dispose();
     _password.dispose();
+    _passwordFocus.dispose();
     super.dispose();
   }
 
@@ -41,20 +44,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
     setState(() {
-      _submitting = true;
+      _busy = true;
       _error = null;
     });
 
     try {
-      await ref.read(sessionControllerProvider.notifier).login(
-            email: _email.text,
-            password: _password.text,
-          );
+      await ref
+          .read(sessionControllerProvider.notifier)
+          .login(email: _email.text, password: _password.text);
       // Navigation is handled by the router redirect.
     } on ApiError catch (e) {
       if (mounted) setState(() => _error = e.message);
     } finally {
-      if (mounted) setState(() => _submitting = false);
+      if (mounted) setState(() => _busy = false);
     }
   }
 
@@ -67,6 +69,53 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     return AuthScaffold(
       title: 'Welcome back',
       subtitle: 'Sign in to continue your field inspections.',
+
+      // Pinned to the bottom of the card by the scaffold's Spacer, rather
+      // than floating directly under the button with dead space beneath.
+      footer: Column(
+        children: <Widget>[
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.sm),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+            ),
+            child: const Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Icon(
+                  Icons.info_outline_rounded,
+                  size: 16,
+                  color: AppColors.textSecondary,
+                ),
+                SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: Text(
+                    'Inspector accounts are issued by your organisation '
+                    'administrator.',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      height: 1.35,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            'Smart Collateral Inspection',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textSecondary.withValues(alpha: 0.7),
+            ),
+          ),
+        ],
+      ),
+
       child: Form(
         key: _formKey,
         child: AutofillGroup(
@@ -86,26 +135,28 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               SciTextField(
                 controller: _email,
                 label: 'EMAIL',
-                hint: 'Enter your account email',
+                hint: 'inspector@sci.rw',
                 icon: Icons.alternate_email_rounded,
                 keyboardType: TextInputType.emailAddress,
                 textInputAction: TextInputAction.next,
-                enabled: !_submitting,
+                enabled: !_busy,
                 autofillHints: const <String>[AutofillHints.username],
                 validator: Validators.email,
+                onFieldSubmitted: (_) => _passwordFocus.requestFocus(),
               ),
               const SizedBox(height: AppSpacing.md),
 
               SciTextField(
                 controller: _password,
+                focusNode: _passwordFocus,
                 label: 'PASSWORD',
-                hint: 'Enter your account password',
+                hint: '••••••••',
                 icon: Icons.lock_outline_rounded,
                 obscureText: _obscure,
                 onToggleObscure: () => setState(() => _obscure = !_obscure),
                 textInputAction: TextInputAction.done,
                 onFieldSubmitted: (_) => _submit(),
-                enabled: !_submitting,
+                enabled: !_busy,
                 autofillHints: const <String>[AutofillHints.password],
                 validator: Validators.required('Password is required'),
               ),
@@ -113,81 +164,35 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
-                  onPressed: _submitting
-                      ? null
-                      : () => context.push(Routes.forgotPassword),
+                  onPressed:
+                      _busy ? null : () => context.push(Routes.forgotPassword),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.xs,
+                      vertical: AppSpacing.xs,
+                    ),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
                   child: const Text('Forgot password?'),
                 ),
               ),
 
               if (_error != null || reason != null) ...<Widget>[
-                const SizedBox(height: AppSpacing.xs),
-                _ErrorBanner(message: _error ?? reason!),
+                const SizedBox(height: AppSpacing.sm),
+                MessageBanner(message: _error ?? reason!),
               ],
 
-              const SizedBox(height: AppSpacing.md),
-              FilledButton(
-                onPressed: _submitting ? null : _submit,
-                child: _submitting
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.2,
-                          valueColor:
-                              AlwaysStoppedAnimation<Color>(Colors.white),
-                        ),
-                      )
-                    : const Text('Sign in'),
-              ),
-
               const SizedBox(height: AppSpacing.lg),
-              // Inspector accounts are provisioned by administrators, so no
-              // sign-up tab and — per the design brief — no social login.
-              const Text(
-                'Inspector accounts are issued by your organisation '
-                'administrator.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textSecondary,
-                  height: 1.4,
-                ),
+              FilledButton(
+                onPressed: _busy ? null : _submit,
+                child: _busy
+                    ? const ButtonSpinner()
+                    : const Text('Sign in'),
               ),
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _ErrorBanner extends StatelessWidget {
-  const _ErrorBanner({required this.message});
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.sm),
-      decoration: BoxDecoration(
-        color: AppColors.danger.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-        border: Border.all(color: AppColors.danger.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          const Icon(Icons.error_outline_rounded,
-              size: 18, color: AppColors.danger),
-          const SizedBox(width: AppSpacing.xs),
-          Expanded(
-            child: Text(
-              message,
-              style: const TextStyle(fontSize: 12.5, color: AppColors.danger),
-            ),
-          ),
-        ],
       ),
     );
   }
