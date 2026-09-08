@@ -11,6 +11,7 @@ import '../../../core/widgets/sci_widgets.dart';
 import '../../auth/application/session_controller.dart';
 import '../../auth/domain/user.dart';
 import '../../properties/application/property_providers.dart';
+import '../application/dashboard_provider.dart';
 import '../application/inspection_providers.dart';
 import '../data/inspections_repository.dart';
 import '../domain/inspection.dart';
@@ -524,6 +525,7 @@ class _CreateInspectionScreenState
                 notes: _notes.text,
               );
       ref.invalidate(inspectionListProvider);
+      ref.invalidate(dashboardProvider);
       if (!mounted) return;
       // Straight to detail so the inspector can start immediately.
       context.pushReplacement(Routes.inspectionDetail(created.id));

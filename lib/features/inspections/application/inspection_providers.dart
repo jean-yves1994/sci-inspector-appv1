@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,6 +9,8 @@ import '../../templates/data/templates_repository.dart';
 import '../../templates/domain/template.dart';
 import '../data/inspections_repository.dart';
 import '../domain/inspection.dart';
+import '../domain/inspection_status.dart';
+import 'dashboard_provider.dart';
 import '../domain/inspection_status.dart';
 
 // ------------------------------------------------------------------ list
@@ -311,6 +314,77 @@ class InspectionWorkspaceNotifier
     });
   }
 
+  /// Updates the visible completeness immediately when the inspector fixes
+  /// a known outstanding requirement. The server remains authoritative; the
+  /// next successful mutation replaces this estimate with the server result.
+  ///
+  /// This is intentionally conservative: when we cannot identify the issue
+  /// that changed, the current server value is kept rather than inventing a
+  /// percentage.
+  CompletenessResult? _optimisticCompleteness({
+    String? fieldCode,
+    String? sectionCode,
+    String? textMatch,
+  }) {
+    final current = _s.completeness;
+    if (current == null) return null;
+
+    final needleField = fieldCode?.trim().toUpperCase();
+    final needleSection = sectionCode?.trim().toUpperCase();
+    final needleText = textMatch?.trim().toUpperCase();
+
+    bool matches(CompletenessIssue issue) {
+      if (needleField != null &&
+          issue.fieldCode?.trim().toUpperCase() == needleField) {
+        return true;
+      }
+      if (needleSection != null &&
+          issue.fieldCode == null &&
+          issue.sectionCode?.trim().toUpperCase() == needleSection) {
+        return true;
+      }
+      if (needleText != null) {
+        final haystack = '${issue.code ?? ''} ${issue.message}'.toUpperCase();
+        return haystack.contains(needleText);
+      }
+      return false;
+    }
+
+    final issues = current.issues.where((i) => !matches(i)).toList();
+    final blocking =
+        current.blockingIssues.where((i) => !matches(i)).toList();
+    final oldOutstanding = current.outstanding.length;
+    final newOutstanding = blocking.isNotEmpty ? blocking.length : issues.length;
+    if (newOutstanding == oldOutstanding) return null;
+
+    final total = current.percentage >= 100
+        ? math.max(1, oldOutstanding)
+        : math.max(
+            oldOutstanding,
+            ((oldOutstanding * 100) /
+                    math.max(1, 100 - current.percentage))
+                .round(),
+          );
+    final percentage = current.percentage >= 100
+        ? 100
+        : ((total - newOutstanding) * 100 / total)
+            .round()
+            .clamp(0, 100)
+            .toInt();
+
+    return CompletenessResult(
+      complete: blocking.isEmpty && issues.isEmpty,
+      percentage: percentage,
+      issues: issues,
+      blockingIssues: blocking,
+    );
+  }
+
+  void _applyOptimisticCompleteness(CompletenessResult? next) {
+    if (next == null || !state.hasValue) return;
+    state = AsyncData(_s.copyWith(completeness: next));
+  }
+
   // ------------------------------------------------------------ reading
 
   InspectionValue? valueFor(String fieldId) {
@@ -325,12 +399,28 @@ class InspectionWorkspaceNotifier
 
   // ------------------------------------------------------------ editing
 
-  void onFieldChanged(InspectionValue value) {
+  void onFieldChanged(InspectionValue value, {String? sectionCode}) {
     if (!state.hasValue) return;
 
     _dirty[value.fieldId] = value;
+    final values = [..._s.inspection.values];
+    final index = values.indexWhere((item) => item.fieldId == value.fieldId);
+    if (index >= 0) {
+      values[index] = value;
+    } else {
+      values.add(value);
+    }
+    final nextCompleteness = _optimisticCompleteness(
+      fieldCode: value.fieldId,
+      sectionCode: sectionCode,
+    );
     state = AsyncData(
-      _s.copyWith(saveStatus: SaveStatus.idle, pendingEdits: _dirty.length),
+      _s.copyWith(
+        inspection: _s.inspection.copyWith(values: values),
+        completeness: nextCompleteness ?? _s.completeness,
+        saveStatus: SaveStatus.idle,
+        pendingEdits: _dirty.length,
+      ),
     );
 
     _debounce?.cancel();
@@ -353,7 +443,11 @@ class InspectionWorkspaceNotifier
       try {
         final result = await ref
             .read(inspectionsRepositoryProvider)
-            .saveValues(id: arg, values: batch.values.toList());
+            .saveValues(
+              id: arg,
+              values: batch.values.toList(),
+              baseVersion: state.valueOrNull?.inspection.version,
+            );
 
         // Clear only what was sent; anything typed during the request stays
         // dirty and is picked up by the next flush.
@@ -422,26 +516,75 @@ class InspectionWorkspaceNotifier
         completeness: updated.completeness ?? _s.completeness,
       ));
       ref.invalidate(inspectionListProvider);
+      ref.invalidate(dashboardProvider);
       ref.invalidate(completenessProvider(arg));
     });
   }
 
-  Future<void> saveAssessment(InspectionAssessment a) => _run(
-        () => ref
-            .read(inspectionsRepositoryProvider)
-            .saveAssessment(id: arg, assessment: a),
+  Future<void> saveAssessment(InspectionAssessment a) {
+    if (state.hasValue) {
+      final assessments = [..._s.inspection.assessments];
+      final index = assessments.indexWhere(
+        (item) => item.categoryCode == a.categoryCode,
       );
+      if (index >= 0) {
+        assessments[index] = a;
+      } else {
+        assessments.add(a);
+      }
+      final nextCompleteness = _optimisticCompleteness(
+        sectionCode: a.categoryCode,
+      );
+      state = AsyncData(_s.copyWith(
+        inspection: _s.inspection.copyWith(assessments: assessments),
+        completeness: nextCompleteness ?? _s.completeness,
+        saveStatus: SaveStatus.idle,
+      ));
+    }
+    return _run(
+      () => ref.read(inspectionsRepositoryProvider).saveAssessment(
+            id: arg,
+            assessment: a,
+            baseVersion: state.valueOrNull?.inspection.version,
+          ),
+    );
+  }
 
-  Future<void> saveOwner(InspectionOwner o) => _run(
-        () =>
-            ref.read(inspectionsRepositoryProvider).saveOwner(id: arg, owner: o),
-      );
+  Future<void> saveOwner(InspectionOwner o) {
+    if (state.hasValue) {
+      _applyOptimisticCompleteness(_optimisticCompleteness(sectionCode: 'OWNER'));
+      state = AsyncData(_s.copyWith(
+        inspection: _s.inspection.copyWith(owner: o),
+        saveStatus: SaveStatus.idle,
+      ));
+    }
+    return _run(
+      () => ref.read(inspectionsRepositoryProvider).saveOwner(
+            id: arg,
+            owner: o,
+            baseVersion: state.valueOrNull?.inspection.version,
+          ),
+    );
+  }
 
-  Future<void> saveValuation(InspectionValuation v) => _run(
-        () => ref
-            .read(inspectionsRepositoryProvider)
-            .saveValuation(id: arg, valuation: v),
+  Future<void> saveValuation(InspectionValuation v) {
+    if (state.hasValue) {
+      _applyOptimisticCompleteness(
+        _optimisticCompleteness(sectionCode: 'VALUATION'),
       );
+      state = AsyncData(_s.copyWith(
+        inspection: _s.inspection.copyWith(valuation: v),
+        saveStatus: SaveStatus.idle,
+      ));
+    }
+    return _run(
+      () => ref.read(inspectionsRepositoryProvider).saveValuation(
+            id: arg,
+            valuation: v,
+            baseVersion: state.valueOrNull?.inspection.version,
+          ),
+    );
+  }
 
   Future<void> captureLocation({
     required double latitude,
@@ -462,8 +605,20 @@ class InspectionWorkspaceNotifier
               source: source,
               isMocked: isMocked,
               capturedAt: capturedAt,
+              baseVersion: state.valueOrNull?.inspection.version,
             ),
       );
+
+  /// Lets the workspace react immediately after a successful photo mutation.
+  void photoChanged(String categoryWire) {
+    if (!state.hasValue) return;
+    final next = _optimisticCompleteness(
+      sectionCode: 'PHOTOS',
+      textMatch: categoryWire,
+    );
+    if (next != null) _applyOptimisticCompleteness(next);
+    ref.invalidate(completenessProvider(arg));
+  }
 
   /// Flushes pending edits, then submits. Refuses if the flush did not land,
   /// since submitting would send an inspection the inspector believes is
@@ -491,6 +646,7 @@ class InspectionWorkspaceNotifier
     await _apply(result);
 
     ref.invalidate(inspectionListProvider);
+    ref.invalidate(dashboardProvider);
     return _s.inspection;
   }
 }

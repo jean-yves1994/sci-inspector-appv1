@@ -59,7 +59,7 @@ class TemplateSectionPage extends ConsumerWidget {
                       field: f,
                       value: notifier.valueFor(f.id),
                       enabled: enabled,
-                      onChanged: notifier.onFieldChanged,
+                      onChanged: (value) => notifier.onFieldChanged(value, sectionCode: section.code),
                     ),
                 ],
               ),
@@ -819,6 +819,9 @@ class PhotosPage extends ConsumerStatefulWidget {
 
 class _PhotosPageState extends ConsumerState<PhotosPage> {
   final Set<String> _uploading = <String>{};
+  final Map<String, double> _uploadProgress = <String, double>{};
+  final Map<String, List<EvidenceFile>> _pendingPreviews =
+      <String, List<EvidenceFile>>{};
 
   Future<void> _capture(PhotoCategory category) async {
     final picker = await showModalBottomSheet<bool>(
@@ -852,8 +855,15 @@ class _PhotosPageState extends ConsumerState<PhotosPage> {
       if (file.exceedsLimit) {
         throw const ApiError(
           code: 'PHOTO_TOO_LARGE',
-          message: 'That image is larger than the 15 MB server limit.',
+          message: 'That image is larger than the 4 MB upload limit.',
         );
+      }
+
+      if (mounted) {
+        setState(() {
+          _pendingPreviews.putIfAbsent(category.wire, () => <EvidenceFile>[]).add(file);
+          _uploadProgress[category.wire] = 0;
+        });
       }
 
       // A retry of this upload must reuse the same id for idempotency.
@@ -875,17 +885,43 @@ class _PhotosPageState extends ConsumerState<PhotosPage> {
             latitude: fix?.latitude,
             longitude: fix?.longitude,
             accuracyM: fix?.accuracyM,
+            onProgress: (sent, total) {
+              if (!mounted || total <= 0) return;
+              setState(() => _uploadProgress[category.wire] = sent / total);
+            },
           );
 
+      if (mounted) {
+        setState(() {
+          final pending = _pendingPreviews[category.wire];
+          if (pending != null && pending.isNotEmpty) pending.removeAt(0);
+          if (pending != null && pending.isEmpty) {
+            _pendingPreviews.remove(category.wire);
+          }
+          _uploadProgress.remove(category.wire);
+        });
+      }
       ref.invalidate(inspectionPhotosProvider(widget.inspectionId));
-      ref.invalidate(completenessProvider(widget.inspectionId));
+      ref.read(inspectionWorkspaceProvider(widget.inspectionId).notifier)
+          .photoChanged(category.wire);
     } on ApiError catch (e) {
       if (mounted) {
+        setState(() {
+          final pending = _pendingPreviews[category.wire];
+          if (pending != null && pending.isNotEmpty) pending.removeAt(0);
+          if (pending != null && pending.isEmpty) _pendingPreviews.remove(category.wire);
+          _uploadProgress.remove(category.wire);
+        });
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(e.message)));
       }
     } finally {
-      if (mounted) setState(() => _uploading.remove(category.wire));
+      if (mounted) {
+        setState(() {
+          _uploading.remove(category.wire);
+          _uploadProgress.remove(category.wire);
+        });
+      }
     }
   }
 
@@ -946,6 +982,8 @@ class _PhotosPageState extends ConsumerState<PhotosPage> {
                     all.where((p) => p.category == entry.key).toList(),
                 enabled: widget.enabled,
                 uploading: _uploading.contains(entry.key.wire),
+                uploadProgress: _uploadProgress[entry.key.wire] ?? 0,
+                pendingPreviews: _pendingPreviews[entry.key.wire] ?? const <EvidenceFile>[],
                 onCapture: () => _capture(entry.key),
                 onDelete: _delete,
               ),
@@ -964,6 +1002,8 @@ class _CategoryBlock extends StatelessWidget {
     required this.photos,
     required this.enabled,
     required this.uploading,
+    required this.uploadProgress,
+    required this.pendingPreviews,
     required this.onCapture,
     required this.onDelete,
   });
@@ -973,12 +1013,15 @@ class _CategoryBlock extends StatelessWidget {
   final List<InspectionPhoto> photos;
   final bool enabled;
   final bool uploading;
+  final double uploadProgress;
+  final List<EvidenceFile> pendingPreviews;
   final VoidCallback onCapture;
   final ValueChanged<InspectionPhoto> onDelete;
 
   @override
   Widget build(BuildContext context) {
-    final satisfied = photos.length >= minCount;
+    final visibleCount = photos.length + pendingPreviews.length;
+    final satisfied = visibleCount >= minCount;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
@@ -998,7 +1041,7 @@ class _CategoryBlock extends StatelessWidget {
                     ),
                   ),
                   StatusBadge(
-                    label: '${photos.length} / $minCount',
+                    label: '$visibleCount / $minCount',
                     color: satisfied
                         ? AppColors.success
                         : (minCount > 0
@@ -1008,20 +1051,28 @@ class _CategoryBlock extends StatelessWidget {
                   ),
                 ],
               ),
-              if (photos.isNotEmpty) ...<Widget>[
+              if (photos.isNotEmpty || pendingPreviews.isNotEmpty) ...<Widget>[
                 const SizedBox(height: AppSpacing.sm),
                 SizedBox(
                   height: 92,
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
-                    itemCount: photos.length,
+                    itemCount: photos.length + pendingPreviews.length,
                     separatorBuilder: (_, __) =>
                         const SizedBox(width: AppSpacing.xs),
-                    itemBuilder: (context, i) => _Thumb(
-                      photo: photos[i],
-                      enabled: enabled,
-                      onDelete: () => onDelete(photos[i]),
-                    ),
+                    itemBuilder: (context, i) {
+                      if (i < photos.length) {
+                        return _Thumb(
+                          photo: photos[i],
+                          enabled: enabled,
+                          onDelete: () => onDelete(photos[i]),
+                        );
+                      }
+                      return _PendingThumb(
+                        file: pendingPreviews[i - photos.length],
+                        progress: uploadProgress,
+                      );
+                    },
                   ),
                 ),
               ],
@@ -1043,6 +1094,56 @@ class _CategoryBlock extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _PendingThumb extends StatelessWidget {
+  const _PendingThumb({required this.file, required this.progress});
+
+  final EvidenceFile file;
+  final double progress;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(AppRadius.sm),
+      child: Stack(
+        alignment: Alignment.center,
+        children: <Widget>[
+          SizedBox(
+            height: 92,
+            width: 92,
+            child: Image.memory(file.bytes, fit: BoxFit.cover),
+          ),
+          Positioned.fill(
+            child: ColoredBox(
+              color: Colors.black.withValues(alpha: 0.35),
+              child: Center(
+                child: CircularProgressIndicator(
+                  value: progress > 0 && progress < 1 ? progress : null,
+                  color: Colors.white,
+                  strokeWidth: 2.5,
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            left: 4,
+            right: 4,
+            bottom: 3,
+            child: Text(
+              progress > 0 ? '${(progress * 100).round()}%' : 'Uploading…',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

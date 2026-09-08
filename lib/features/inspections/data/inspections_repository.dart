@@ -126,16 +126,9 @@ class InspectionsRepository {
     return Inspection.fromJson(unwrap(d));
   }
 
-  /// Reads ONLY the concurrency token.
-  ///
-  /// Every write calls this immediately beforehand, so `baseVersion` is always
-  /// the server's current value rather than a number cached earlier in the
-  /// session. This removes version drift as a category of bug: no cached
-  /// version means nothing to go stale.
-  ///
-  /// Costs one small GET per save. Optimistic concurrency remains enforced
-  /// server-side — the conflict window narrows to the milliseconds between
-  /// this read and the write, rather than the minutes a screen stays open.
+  /// Reads the authoritative concurrency token for callers that do not have
+  /// an active workspace session. Workspace mutations pass their current
+  /// version directly, avoiding an extra GET for every edit.
   Future<int> currentVersion(String id) async {
     final inspection = await byId(id);
     return inspection.version;
@@ -183,20 +176,21 @@ class InspectionsRepository {
 
   // ----------------------------------------------------------- mutations
   //
-  // Each reads the authoritative version first. If the write still returns a
-  // stale-version conflict, it means a genuine concurrent writer, and the
-  // error propagates rather than being retried blindly.
+  // The workspace passes its current server version so ordinary edits do not
+  // perform a GET immediately before every PATCH. The optional fallback keeps
+  // this repository safe for callers that do not own a workspace session.
 
   Future<MutationResult> saveValues({
     required String id,
     required List<InspectionValue> values,
+    int? baseVersion,
   }) async {
-    final baseVersion = await currentVersion(id);
+    final version = baseVersion ?? await currentVersion(id);
     final d = await _api.patch<Map<String, dynamic>>(
       '/inspections/$id/values',
       body: <String, dynamic>{
         'values': values.map((v) => v.toJson()).toList(),
-        'baseVersion': baseVersion,
+        'baseVersion': version,
       },
     );
     return MutationResult.parse(d);
@@ -205,13 +199,14 @@ class InspectionsRepository {
   Future<MutationResult> saveAssessment({
     required String id,
     required InspectionAssessment assessment,
+    int? baseVersion,
   }) async {
-    final baseVersion = await currentVersion(id);
+    final version = baseVersion ?? await currentVersion(id);
     final d = await _api.patch<Map<String, dynamic>>(
       '/inspections/$id/assessments',
       body: <String, dynamic>{
         ...assessment.toJson(),
-        'baseVersion': baseVersion,
+        'baseVersion': version,
       },
     );
     return MutationResult.parse(d);
@@ -220,11 +215,12 @@ class InspectionsRepository {
   Future<MutationResult> saveOwner({
     required String id,
     required InspectionOwner owner,
+    int? baseVersion,
   }) async {
-    final baseVersion = await currentVersion(id);
+    final version = baseVersion ?? await currentVersion(id);
     final d = await _api.patch<Map<String, dynamic>>(
       '/inspections/$id/owner',
-      body: <String, dynamic>{...owner.toJson(), 'baseVersion': baseVersion},
+      body: <String, dynamic>{...owner.toJson(), 'baseVersion': version},
     );
     return MutationResult.parse(d);
   }
@@ -232,13 +228,14 @@ class InspectionsRepository {
   Future<MutationResult> saveValuation({
     required String id,
     required InspectionValuation valuation,
+    int? baseVersion,
   }) async {
-    final baseVersion = await currentVersion(id);
+    final version = baseVersion ?? await currentVersion(id);
     final d = await _api.patch<Map<String, dynamic>>(
       '/inspections/$id/valuation',
       body: <String, dynamic>{
         ...valuation.toJson(),
-        'baseVersion': baseVersion,
+        'baseVersion': version,
       },
     );
     return MutationResult.parse(d);
@@ -253,8 +250,9 @@ class InspectionsRepository {
     String source = 'GPS',
     bool isMocked = false,
     DateTime? capturedAt,
+    int? baseVersion,
   }) async {
-    final baseVersion = await currentVersion(id);
+    final version = baseVersion ?? await currentVersion(id);
     final d = await _api.post<Map<String, dynamic>>(
       '/inspections/$id/location',
       body: <String, dynamic>{
@@ -265,7 +263,7 @@ class InspectionsRepository {
         'source': source,
         'isMocked': isMocked,
         'capturedAt': (capturedAt ?? DateTime.now()).toUtc().toIso8601String(),
-        'baseVersion': baseVersion,
+        'baseVersion': version,
       },
     );
     return MutationResult.parse(d);
