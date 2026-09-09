@@ -16,6 +16,8 @@ import '../application/inspection_providers.dart';
 import '../data/inspections_repository.dart';
 import '../domain/inspection.dart';
 import '../domain/inspection_status.dart';
+import '../../payments/application/payment_controller.dart';
+import '../../payments/presentation/payment_screen.dart';
 
 // --------------------------------------------------------------- list
 
@@ -27,8 +29,7 @@ class InspectionListScreen extends ConsumerStatefulWidget {
       _InspectionListScreenState();
 }
 
-class _InspectionListScreenState
-    extends ConsumerState<InspectionListScreen> {
+class _InspectionListScreenState extends ConsumerState<InspectionListScreen> {
   final _search = TextEditingController();
   final _scroll = ScrollController();
 
@@ -47,8 +48,7 @@ class _InspectionListScreenState
   void initState() {
     super.initState();
     _scroll.addListener(() {
-      if (_scroll.position.pixels >=
-          _scroll.position.maxScrollExtent - 400) {
+      if (_scroll.position.pixels >= _scroll.position.maxScrollExtent - 400) {
         ref.read(inspectionListProvider.notifier).loadMore();
       }
     });
@@ -89,9 +89,8 @@ class _InspectionListScreenState
                           icon: const Icon(Icons.close_rounded, size: 18),
                           onPressed: () {
                             _search.clear();
-                            ref
-                                .read(inspectionSearchProvider.notifier)
-                                .state = '';
+                            ref.read(inspectionSearchProvider.notifier).state =
+                                '';
                           },
                         ),
                 ),
@@ -102,11 +101,9 @@ class _InspectionListScreenState
             height: 42,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
               itemCount: _filters.length,
-              separatorBuilder: (_, __) =>
-                  const SizedBox(width: AppSpacing.xs),
+              separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.xs),
               itemBuilder: (context, i) {
                 final (label, status) = _filters[i];
                 return ChoiceChip(
@@ -258,8 +255,7 @@ class InspectionCard extends StatelessWidget {
                   child: LinearProgressIndicator(
                     value: item.percentage! / 100,
                     minHeight: 4,
-                    backgroundColor:
-                        AppColors.primary.withValues(alpha: 0.12),
+                    backgroundColor: AppColors.primary.withValues(alpha: 0.12),
                   ),
                 ),
               ],
@@ -307,8 +303,7 @@ class InspectionDetailScreen extends ConsumerWidget {
                             child: Text(
                               i.inspectionNumber ?? 'Inspection',
                               style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w800),
+                                  fontSize: 18, fontWeight: FontWeight.w800),
                             ),
                           ),
                           StatusBadge(
@@ -318,6 +313,15 @@ class InspectionDetailScreen extends ConsumerWidget {
                           ),
                         ],
                       ),
+                      // Payment only matters before the inspection starts.
+                      if (i.status.canStart) ...<Widget>[
+                        const SizedBox(height: AppSpacing.sm),
+                        Row(
+                          children: <Widget>[
+                            PaymentStatusBadge(inspectionId: inspectionId),
+                          ],
+                        ),
+                      ],
                       const SizedBox(height: AppSpacing.sm),
                       _kv('Property', i.propertyName),
                       _kv('Property ref', i.propertyReference),
@@ -325,16 +329,14 @@ class InspectionDetailScreen extends ConsumerWidget {
                       _kv('Client', i.clientName),
                       _kv('Priority', i.priority.label),
                       if (i.dueDate != null)
-                        _kv('Due',
-                            DateFormat('d MMM yyyy').format(i.dueDate!)),
+                        _kv('Due', DateFormat('d MMM yyyy').format(i.dueDate!)),
                       if (i.submittedAt != null)
                         _kv(
                           'Submitted',
                           DateFormat('d MMM yyyy HH:mm')
                               .format(i.submittedAt!.toLocal()),
                         ),
-                      if (i.reviewerName != null &&
-                          i.reviewerName!.isNotEmpty)
+                      if (i.reviewerName != null && i.reviewerName!.isNotEmpty)
                         _kv('Reviewer', i.reviewerName),
                     ],
                   ),
@@ -417,6 +419,18 @@ class _DetailActions extends ConsumerStatefulWidget {
 class _DetailActionsState extends ConsumerState<_DetailActions> {
   bool _busy = false;
 
+  Future<void> _openPayment() async {
+    final paid = await context.push<bool>(
+      Routes.inspectionPayment(widget.inspectionId),
+    );
+
+    // The screen pops with true once the webhook confirms. Refresh so the
+    // button flips to "Start inspection".
+    if ((paid ?? false) && mounted) {
+      ref.invalidate(paymentControllerProvider(widget.inspectionId));
+    }
+  }
+
   Future<void> _start() async {
     setState(() => _busy = true);
     try {
@@ -427,10 +441,18 @@ class _DetailActionsState extends ConsumerState<_DetailActions> {
         context.push(Routes.inspectionWorkspace(widget.inspectionId));
       }
     } on ApiError catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(e.message)));
+      if (!mounted) return;
+
+      // The server is the real gate. If our local payment state was stale —
+      // the app was open before the payment expired, for instance — route to
+      // payment rather than showing a message the inspector cannot act on.
+      if (e.requiresPayment) {
+        await _openPayment();
+        return;
       }
+
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -439,8 +461,19 @@ class _DetailActionsState extends ConsumerState<_DetailActions> {
   @override
   Widget build(BuildContext context) {
     // Reviewer decisions are never exposed here.
+    //
+    // Watch the payment so the button flips the moment the webhook lands.
+    // Defaults to false while loading, so the gate fails closed.
+    final isPaid = ref.watch(inspectionIsPaidProvider(widget.inspectionId));
+
     final Widget? action;
-    if (widget.status.canStart) {
+    if (widget.status.canStart && !isPaid) {
+      action = FilledButton.icon(
+        onPressed: _busy ? null : _openPayment,
+        icon: const Icon(Icons.payments_outlined, size: 20),
+        label: const Text('Pay RWF 15,000'),
+      );
+    } else if (widget.status.canStart) {
       action = FilledButton.icon(
         onPressed: _busy ? null : _start,
         icon: _busy
@@ -515,15 +548,14 @@ class _CreateInspectionScreenState
       _error = null;
     });
     try {
-      final created =
-          await ref.read(inspectionsRepositoryProvider).create(
-                propertyId: widget.propertyId,
-                loanReference: _loanRef.text,
-                clientName: _client.text,
-                priority: _priority.wire,
-                dueDate: _dueDate,
-                notes: _notes.text,
-              );
+      final created = await ref.read(inspectionsRepositoryProvider).create(
+            propertyId: widget.propertyId,
+            loanReference: _loanRef.text,
+            clientName: _client.text,
+            priority: _priority.wire,
+            dueDate: _dueDate,
+            notes: _notes.text,
+          );
       ref.invalidate(inspectionListProvider);
       ref.invalidate(dashboardProvider);
       if (!mounted) return;
@@ -556,8 +588,7 @@ class _CreateInspectionScreenState
           ? const EmptyState(
               icon: Icons.lock_outline_rounded,
               title: 'Not permitted',
-              message:
-                  'Your account cannot create inspections.',
+              message: 'Your account cannot create inspections.',
             )
           : Form(
               key: _formKey,
@@ -592,8 +623,7 @@ class _CreateInspectionScreenState
                     label: 'CLIENT NAME',
                     icon: Icons.person_outline_rounded,
                     enabled: !_busy,
-                    validator:
-                        Validators.required('Client name is required'),
+                    validator: Validators.required('Client name is required'),
                   ),
                   const SizedBox(height: AppSpacing.md),
                   Column(
@@ -618,8 +648,7 @@ class _CreateInspectionScreenState
                         ],
                         onChanged: _busy
                             ? null
-                            : (v) => setState(
-                                () => _priority = v ?? _priority),
+                            : (v) => setState(() => _priority = v ?? _priority),
                       ),
                     ],
                   ),
@@ -653,8 +682,7 @@ class _CreateInspectionScreenState
                               },
                         child: InputDecorator(
                           decoration: const InputDecoration(
-                            prefixIcon:
-                                Icon(Icons.event_outlined, size: 20),
+                            prefixIcon: Icon(Icons.event_outlined, size: 20),
                           ),
                           child: Text(
                             _dueDate == null

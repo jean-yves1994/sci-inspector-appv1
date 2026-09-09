@@ -13,6 +13,7 @@ class ApiErrorCode {
       'INSPECTION_INVALID_TRANSITION';
   static const String inspectionIncomplete = 'INSPECTION_INCOMPLETE';
   static const String inspectionStaleVersion = 'INSPECTION_STALE_VERSION';
+  static const String inspectionPaymentRequired = 'INSPECTION_PAYMENT_REQUIRED';
   static const String validation = 'VALIDATION_ERROR';
   static const String photoTooLarge = 'PHOTO_TOO_LARGE';
   static const String photoInvalidType = 'PHOTO_INVALID_TYPE';
@@ -64,6 +65,10 @@ class ApiError implements Exception {
       code == ApiErrorCode.network || code == ApiErrorCode.timeout;
 
   bool get isStaleVersion => code == ApiErrorCode.inspectionStaleVersion;
+
+  /// The backend rejected `start` because the inspection fee is unpaid.
+  /// The app routes to the payment screen rather than just showing the text.
+  bool get requiresPayment => code == ApiErrorCode.inspectionPaymentRequired;
   bool get isIncomplete => code == ApiErrorCode.inspectionIncomplete;
   bool get isValidation => code == ApiErrorCode.validation;
 

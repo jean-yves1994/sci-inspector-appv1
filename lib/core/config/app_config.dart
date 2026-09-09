@@ -12,7 +12,7 @@ class AppConfig {
 
   static const String environment = String.fromEnvironment(
     'SCI_ENV',
-    defaultValue: 'development',
+    defaultValue: 'production',
   );
 
   /// Development-only platform override.

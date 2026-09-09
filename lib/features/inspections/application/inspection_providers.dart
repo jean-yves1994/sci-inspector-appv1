@@ -11,7 +11,6 @@ import '../data/inspections_repository.dart';
 import '../domain/inspection.dart';
 import '../domain/inspection_status.dart';
 import 'dashboard_provider.dart';
-import '../domain/inspection_status.dart';
 
 // ------------------------------------------------------------------ list
 
@@ -351,18 +350,17 @@ class InspectionWorkspaceNotifier
     }
 
     final issues = current.issues.where((i) => !matches(i)).toList();
-    final blocking =
-        current.blockingIssues.where((i) => !matches(i)).toList();
+    final blocking = current.blockingIssues.where((i) => !matches(i)).toList();
     final oldOutstanding = current.outstanding.length;
-    final newOutstanding = blocking.isNotEmpty ? blocking.length : issues.length;
+    final newOutstanding =
+        blocking.isNotEmpty ? blocking.length : issues.length;
     if (newOutstanding == oldOutstanding) return null;
 
     final total = current.percentage >= 100
         ? math.max(1, oldOutstanding)
         : math.max(
             oldOutstanding,
-            ((oldOutstanding * 100) /
-                    math.max(1, 100 - current.percentage))
+            ((oldOutstanding * 100) / math.max(1, 100 - current.percentage))
                 .round(),
           );
     final percentage = current.percentage >= 100
@@ -441,9 +439,7 @@ class InspectionWorkspaceNotifier
       );
 
       try {
-        final result = await ref
-            .read(inspectionsRepositoryProvider)
-            .saveValues(
+        final result = await ref.read(inspectionsRepositoryProvider).saveValues(
               id: arg,
               values: batch.values.toList(),
               baseVersion: state.valueOrNull?.inspection.version,
@@ -552,7 +548,8 @@ class InspectionWorkspaceNotifier
 
   Future<void> saveOwner(InspectionOwner o) {
     if (state.hasValue) {
-      _applyOptimisticCompleteness(_optimisticCompleteness(sectionCode: 'OWNER'));
+      _applyOptimisticCompleteness(
+          _optimisticCompleteness(sectionCode: 'OWNER'));
       state = AsyncData(_s.copyWith(
         inspection: _s.inspection.copyWith(owner: o),
         saveStatus: SaveStatus.idle,

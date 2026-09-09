@@ -21,16 +21,20 @@ class Routes {
 
   static const String inspectionNewPattern = '/inspections/new/:propertyId';
   static const String inspectionDetailPattern = '/inspections/:id';
-  static const String inspectionWorkspacePattern =
-      '/inspections/:id/workspace';
+  static const String inspectionWorkspacePattern = '/inspections/:id/workspace';
+  static const String inspectionPaymentPattern = '/inspections/:id/payment';
 
   static String inspectionNewFor(String propertyId) =>
       '/inspections/new/$propertyId';
   static String inspectionDetail(String id) => '/inspections/$id';
   static String inspectionWorkspace(String id, {String? section}) =>
       '/inspections/$id/workspace${section == null ? '' : '?section=$section'}';
+  static String inspectionPayment(String id, {String? number}) =>
+      '/inspections/$id/payment${number == null ? '' : '?number=$number'}';
 
   static const Set<String> unauthenticated = <String>{
-    login, forgotPassword, resetPassword,
+    login,
+    forgotPassword,
+    resetPassword,
   };
 }

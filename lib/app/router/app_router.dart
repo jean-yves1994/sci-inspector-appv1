@@ -13,6 +13,7 @@ import '../../features/properties/presentation/property_screens.dart';
 import '../../features/splash/splash_screen.dart';
 import '../shell/app_shell.dart';
 import 'routes.dart';
+import '../../features/payments/presentation/payment_screen.dart';
 
 final _rootKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 final _shellKey = GlobalKey<NavigatorState>(debugLabel: 'shell');
@@ -87,8 +88,18 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.inspectionNewPattern,
         parentNavigatorKey: _rootKey,
-        builder: (c, s) => CreateInspectionScreen(
-            propertyId: s.pathParameters['propertyId']!),
+        builder: (c, s) =>
+            CreateInspectionScreen(propertyId: s.pathParameters['propertyId']!),
+      ),
+      // Before the ':id' route, same as propertyNew — otherwise go_router
+      // would try to parse 'payment' as part of the id.
+      GoRoute(
+        path: Routes.inspectionPaymentPattern,
+        parentNavigatorKey: _rootKey,
+        builder: (c, s) => InspectionPaymentScreen(
+          inspectionId: s.pathParameters['id']!,
+          inspectionNumber: s.uri.queryParameters['number'],
+        ),
       ),
       GoRoute(
         path: Routes.inspectionWorkspacePattern,
