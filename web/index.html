@@ -4,16 +4,35 @@
   <base href="$FLUTTER_BASE_HREF">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#2747AA">
+  <meta name="theme-color" content="#015193">
   <meta name="description" content="Smart Collateral Inspection - Inspector field application">
   <title>SCI Inspector</title>
   <link rel="manifest" href="manifest.json">
   <style>
     html, body {
-      margin: 0; padding: 0; height: 100%;
-      background: linear-gradient(135deg, #3A5FD0 0%, #2747AA 55%, #1B3178 100%);
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      min-width: 100%;
+      min-height: 100%;
+      overflow: hidden;
+      background: linear-gradient(135deg, #2A79C4 0%, #015193 55%, #013A6B 100%);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
+
+    /* Keep the Flutter web surface attached to the complete browser viewport.
+       Without an explicit host size, some embedded/browser previews can leave
+       the Flutter canvas at a narrow width and expose the page background beside it. */
+    flt-glass-pane {
+      position: fixed !important;
+      inset: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      min-width: 100vw !important;
+      min-height: 100vh !important;
+    }
+
     #sci-loader {
       position: fixed; inset: 0; display: flex; flex-direction: column;
       align-items: center; justify-content: center; gap: 20px;
@@ -22,11 +41,11 @@
     #sci-loader.hidden { opacity: 0; pointer-events: none; }
     .sci-mark {
       width: 92px; height: 92px; border-radius: 24px; background: #fff;
-      color: #2747AA; display: flex; align-items: center;
+      color: #015193; display: flex; align-items: center;
       justify-content: center; font-size: 26px; font-weight: 800;
       letter-spacing: 1.5px; box-shadow: 0 10px 28px rgba(0,0,0,.22);
     }
-    .sci-title { font-size: 15px; font-weight: 600; opacity: .92; }
+    .sci-title { font-size: 15px; font-weight: 600; opacity: .92; text-align: center; padding: 0 20px; }
     .sci-bar {
       width: 160px; height: 3px; border-radius: 8px;
       background: rgba(255,255,255,.25); overflow: hidden;
