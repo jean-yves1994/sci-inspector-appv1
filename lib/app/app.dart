@@ -23,7 +23,13 @@ class SciInspectorApp extends ConsumerWidget {
             .clamp(minScaleFactor: 0.9, maxScaleFactor: 1.5);
         return MediaQuery(
           data: MediaQuery.of(context).copyWith(textScaler: scaler),
-          child: MobileFrame(child: child ?? const SizedBox.shrink()),
+          // MaterialApp.router can receive a tighter child constraint than the
+          // host viewport (especially in browser/device-preview environments).
+          // Expand the frame first so full-screen routes such as the splash
+          // actually paint across the entire available surface.
+          child: SizedBox.expand(
+            child: MobileFrame(child: child ?? const SizedBox.shrink()),
+          ),
         );
       },
     );
