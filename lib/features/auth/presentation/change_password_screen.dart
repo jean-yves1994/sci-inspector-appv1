@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../app/router/routes.dart';
 import '../../../core/network/api_error.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -52,7 +54,13 @@ class _ChangePasswordScreenState
             currentPassword: _current.text,
             newPassword: _next.text,
           );
-      // Router redirect takes over once mustChangePassword flips to false.
+
+      // Explicitly replace the password-change route after the session has
+      // been refreshed. This makes the post-password-change destination
+      // deterministic instead of relying only on the router refresh cycle.
+      if (mounted) {
+        context.go(Routes.home);
+      }
     } on ApiError catch (e) {
       if (mounted) setState(() => _error = e.message);
     } finally {
