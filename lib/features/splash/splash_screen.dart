@@ -34,9 +34,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
   late final Animation<double> _fade =
       CurvedAnimation(parent: _c, curve: Curves.easeOut);
-  late final Animation<double> _scale =
-      Tween<double>(begin: 0.86, end: 1)
-          .animate(CurvedAnimation(parent: _c, curve: Curves.easeOutBack));
+  late final Animation<double> _scale = Tween<double>(begin: 0.86, end: 1)
+      .animate(CurvedAnimation(parent: _c, curve: Curves.easeOutBack));
 
   @override
   void dispose() {
@@ -49,101 +48,131 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     final bootstrap = ref.watch(bootstrapProvider);
 
     return Scaffold(
-      body: DecoratedBox(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: AppColors.authHeroGradient,
+      body: SizedBox.expand(
+        child: DecoratedBox(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: AppColors.authHeroGradient,
+            ),
           ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: <Widget>[
-              const Spacer(),
-              FadeTransition(
-                opacity: _fade,
-                child: ScaleTransition(
-                  scale: _scale,
-                  child: Container(
-                    height: 104,
-                    width: 104,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(28),
-                      boxShadow: <BoxShadow>[
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.22),
-                          blurRadius: 28,
-                          offset: const Offset(0, 10),
-                        ),
-                      ],
-                    ),
-                    alignment: Alignment.center,
-                    child: const Text(
-                      'SCI',
-                      style: TextStyle(
-                        color: AppColors.primary,
-                        fontSize: 29,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.5,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              FadeTransition(
-                opacity: _fade,
-                child: const Column(
+          child: SafeArea(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final compact = constraints.maxWidth < 400;
+                final horizontalPadding = compact ? 20.0 : 32.0;
+                final titleSize = compact ? 17.0 : 19.0;
+
+                return Column(
                   children: <Widget>[
-                    Text(
-                      'Smart Collateral Inspection',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 19,
-                        fontWeight: FontWeight.w700,
+                    const Spacer(),
+                    FadeTransition(
+                      opacity: _fade,
+                      child: ScaleTransition(
+                        scale: _scale,
+                        child: Container(
+                          height: compact ? 96 : 104,
+                          width: compact ? 96 : 104,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius:
+                                BorderRadius.circular(compact ? 26 : 28),
+                            boxShadow: <BoxShadow>[
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.22),
+                                blurRadius: 28,
+                                offset: const Offset(0, 10),
+                              ),
+                            ],
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            'SCI',
+                            style: TextStyle(
+                              color: AppColors.primary,
+                              fontSize: compact ? 27 : 29,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1.5,
+                            ),
+                          ),
+                        ),
                       ),
                     ),
-                    SizedBox(height: AppSpacing.xxs),
-                    Text(
-                      'Inspector Field Application',
-                      style: TextStyle(color: Colors.white70, fontSize: 13),
+                    const SizedBox(height: AppSpacing.xl),
+                    FadeTransition(
+                      opacity: _fade,
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: horizontalPadding,
+                        ),
+                        child: Column(
+                          children: <Widget>[
+                            Text(
+                              'Smart Collateral Inspection',
+                              textAlign: TextAlign.center,
+                              softWrap: true,
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: titleSize,
+                                fontWeight: FontWeight.w700,
+                                height: 1.2,
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.xxs),
+                            const Text(
+                              'Inspector Field Application',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.xxxl),
+                      child: bootstrap.when(
+                        loading: () => const _Bar(label: 'Preparing…'),
+                        data: (_) => const _Bar(label: 'Starting…'),
+                        error: (e, _) => Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.xl,
+                          ),
+                          child: Column(
+                            children: <Widget>[
+                              const Icon(
+                                Icons.wifi_off_rounded,
+                                color: Colors.white70,
+                                size: 30,
+                              ),
+                              const SizedBox(height: AppSpacing.sm),
+                              const Text(
+                                'Could not start the application',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.md),
+                              FilledButton.tonal(
+                                onPressed: () =>
+                                    ref.invalidate(bootstrapProvider),
+                                child: const Text('Retry'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
                   ],
-                ),
-              ),
-              const Spacer(),
-              Padding(
-                padding: const EdgeInsets.only(bottom: AppSpacing.xxxl),
-                child: bootstrap.when(
-                  loading: () => const _Bar(label: 'Preparing…'),
-                  data: (_) => const _Bar(label: 'Starting…'),
-                  error: (e, _) => Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.xl),
-                    child: Column(
-                      children: <Widget>[
-                        const Icon(Icons.wifi_off_rounded,
-                            color: Colors.white70, size: 30),
-                        const SizedBox(height: AppSpacing.sm),
-                        const Text(
-                          'Could not start the application',
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700),
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                        FilledButton.tonal(
-                          onPressed: () => ref.invalidate(bootstrapProvider),
-                          child: const Text('Retry'),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
+                );
+              },
+            ),
           ),
         ),
       ),
@@ -171,8 +200,10 @@ class _Bar extends StatelessWidget {
           ),
         ),
         const SizedBox(height: AppSpacing.sm),
-        Text(label,
-            style: const TextStyle(color: Colors.white70, fontSize: 12)),
+        Text(
+          label,
+          style: const TextStyle(color: Colors.white70, fontSize: 12),
+        ),
       ],
     );
   }
