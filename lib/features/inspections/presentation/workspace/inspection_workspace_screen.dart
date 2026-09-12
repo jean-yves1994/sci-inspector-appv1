@@ -1,47 +1,121 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
 import '../../../../core/network/api_error.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/sci_widgets.dart';
 import '../../../templates/domain/template.dart';
 import '../../application/inspection_providers.dart';
 import '../../domain/inspection_status.dart';
-import 'conditional_template_section_page.dart';
 import 'section_pages.dart';
 import 'save_status_bar.dart';
 
-class _Step { const _Step({required this.title, required this.builder, this.code}); final String title; final String? code; final Widget Function(BuildContext) builder; }
+/// One workspace step. Sections come from the backend template; the fixed
+/// steps (owner, valuation, location, photos, review) are backend endpoints.
+class _Step {
+  const _Step({required this.title, required this.builder, this.code});
+  final String title;
+  final String? code;
+  final Widget Function(BuildContext) builder;
+}
 
 class InspectionWorkspaceScreen extends ConsumerStatefulWidget {
   const InspectionWorkspaceScreen({required this.inspectionId, this.initialSection, super.key});
-  final String inspectionId; final String? initialSection;
+  final String inspectionId;
+  final String? initialSection;
   @override ConsumerState<InspectionWorkspaceScreen> createState() => _InspectionWorkspaceScreenState();
 }
 class _InspectionWorkspaceScreenState extends ConsumerState<InspectionWorkspaceScreen> {
-  int _index = 0; bool _jumped = false; List<String?> _stepCodes = <String?>[];
-  @override Widget build(BuildContext context) {
-    final id = widget.inspectionId; final state = ref.watch(inspectionWorkspaceProvider(id));
+  int _index = 0;
+  bool _jumped = false;
+  List<String?> _stepCodes = <String?>[];
+  @override
+  Widget build(BuildContext context) {
+    final id = widget.inspectionId;
+    final state = ref.watch(inspectionWorkspaceProvider(id));
     return state.when(
       loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (e, _) => Scaffold(appBar: AppBar(title: const Text('Inspection')), body: ErrorStateView(error: e, onRetry: () => ref.invalidate(inspectionWorkspaceProvider(id)))),
       data: (ws) {
-        final inspection = ws.inspection; final template = ws.template; final enabled = inspection.isEditable; final steps = _buildSteps(template, enabled); _stepCodes = steps.map((s) => s.code).toList();
-        if (!_jumped && widget.initialSection != null) { _jumped = true; final target = steps.indexWhere((s) => s.code == widget.initialSection!.toUpperCase()); if (target >= 0) WidgetsBinding.instance.addPostFrameCallback((_) => setState(() => _index = target)); }
+        final inspection = ws.inspection;
+        final template = ws.template;
+        final enabled = inspection.isEditable;
+        final steps = _buildSteps(template, enabled);
+        _stepCodes = steps.map((s) => s.code).toList();
+        if (!_jumped && widget.initialSection != null) {
+          _jumped = true;
+          final target = steps.indexWhere((s) => s.code == widget.initialSection!.toUpperCase());
+          if (target >= 0) WidgetsBinding.instance.addPostFrameCallback((_) => setState(() => _index = target));
+        }
         final safeIndex = _index.clamp(0, steps.length - 1);
-        return Scaffold(appBar: AppBar(title: Text(inspection.inspectionNumber ?? 'Inspection'), actions: <Widget>[_SaveIndicator(status: ws.saveStatus)], bottom: PreferredSize(preferredSize: const Size.fromHeight(46), child: SizedBox(height: 46, child: ListView.separated(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xxs), itemCount: steps.length, separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.xs), itemBuilder: (context, i) => ChoiceChip(label: Text('${i + 1}. ${steps[i].title}'), selected: i == safeIndex, onSelected: (_) => setState(() => _index = i))))), body: Column(children: <Widget>[if (!enabled) MessageBanner(message: 'This inspection is ${inspection.status.label.toLowerCase()} and is read-only.', color: AppColors.offline, icon: Icons.lock_outline_rounded), SaveStatusBar(inspectionId: id), if (inspection.status.isCorrection) const MessageBanner(message: 'Corrections were requested by the reviewer. Update the inspection and resubmit it.', color: AppColors.warning, icon: Icons.report_problem_outlined), Expanded(child: steps[safeIndex].builder(context))]), bottomNavigationBar: _ProgressBar(inspectionId: id, onOpenReview: () => setState(() => _index = steps.length - 1)));
-      });
+        return Scaffold(
+          appBar: AppBar(
+            title: Text(inspection.inspectionNumber ?? 'Inspection'),
+            actions: <Widget>[_SaveIndicator(status: ws.saveStatus)],
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(46),
+              child: SizedBox(height: 46, child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xxs),
+                itemCount: steps.length,
+                separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.xs),
+                itemBuilder: (context, i) => ChoiceChip(label: Text('${i + 1}. ${steps[i].title}'), selected: i == safeIndex, onSelected: (_) => setState(() => _index = i)),
+              )),
+          ),
+          body: Column(children: <Widget>[
+            if (!enabled) MessageBanner(message: 'This inspection is ${inspection.status.label.toLowerCase()} and is read-only.', color: AppColors.offline, icon: Icons.lock_outline_rounded),
+            SaveStatusBar(inspectionId: id),
+            if (inspection.status.isCorrection) const MessageBanner(message: 'Corrections were requested by the reviewer. Update the inspection and resubmit it.', color: AppColors.warning, icon: Icons.report_problem_outlined),
+            Expanded(child: steps[safeIndex].builder(context)),
+          ]),
+          bottomNavigationBar: _ProgressBar(inspectionId: id, onOpenReview: () => setState(() => _index = steps.length - 1)),
+        );
+      },
+    );
   }
   List<_Step> _buildSteps(InspectionTemplate? template, bool enabled) {
-    final id = widget.inspectionId; final steps = <_Step>[];
-    for (final s in template?.fieldSections ?? const <TemplateSection>[]) steps.add(_Step(title: s.name, code: s.code, builder: (_) => ConditionalTemplateSectionPage(inspectionId: id, section: s, enabled: enabled)));
-    final assessments = template?.assessmentSections ?? const <TemplateSection>[]; if (assessments.isNotEmpty) steps.add(_Step(title: 'Condition', code: 'ASSESSMENTS', builder: (_) => AssessmentsPage(inspectionId: id, sections: assessments, enabled: enabled)));
-    steps.addAll(<_Step>[_Step(title: 'Owner', code: 'OWNER', builder: (_) => OwnerPage(inspectionId: id, enabled: enabled)), _Step(title: 'Valuation', code: 'VALUATION', builder: (_) => ValuationPage(inspectionId: id, enabled: enabled)), _Step(title: 'Location', code: 'LOCATION', builder: (_) => LocationPage(inspectionId: id, enabled: enabled)), _Step(title: 'Photos', code: 'PHOTOS', builder: (_) => PhotosPage(inspectionId: id, rules: template?.photoRules ?? const <TemplatePhotoRule>[], enabled: enabled)), _Step(title: 'Review', code: 'REVIEW', builder: (_) => ReviewPage(inspectionId: id, onNavigateToSection: (code) { final i = _stepCodes.indexOf(code.toUpperCase()); if (i >= 0) setState(() => _index = i); }))]);
+    final id = widget.inspectionId;
+    final steps = <_Step>[];
+    for (final s in template?.fieldSections ?? const <TemplateSection>[]) {
+      steps.add(_Step(title: s.name, code: s.code, builder: (_) => TemplateSectionPage(inspectionId: id, section: s, enabled: enabled)));
+    }
+    final assessmentSections = template?.assessmentSections ?? const <TemplateSection>[];
+    if (assessmentSections.isNotEmpty) steps.add(_Step(title: 'Condition', code: 'ASSESSMENTS', builder: (_) => AssessmentsPage(inspectionId: id, sections: assessmentSections, enabled: enabled)));
+    steps.addAll(<_Step>[
+      _Step(title: 'Owner', code: 'OWNER', builder: (_) => OwnerPage(inspectionId: id, enabled: enabled)),
+      _Step(title: 'Valuation', code: 'VALUATION', builder: (_) => ValuationPage(inspectionId: id, enabled: enabled)),
+      _Step(title: 'Location', code: 'LOCATION', builder: (_) => LocationPage(inspectionId: id, enabled: enabled)),
+      _Step(title: 'Photos', code: 'PHOTOS', builder: (_) => PhotosPage(inspectionId: id, rules: template?.photoRules ?? const <TemplatePhotoRule>[], enabled: enabled)),
+      _Step(title: 'Review', code: 'REVIEW', builder: (_) => ReviewPage(inspectionId: id, onNavigateToSection: (code) { final i = _stepCodes.indexOf(code.toUpperCase()); if (i >= 0) setState(() => _index = i); })),
+    ]);
+    if (template == null) steps.insert(0, _Step(title: 'Template', builder: (_) => const Padding(padding: EdgeInsets.all(AppSpacing.md), child: MessageBanner(message: 'The inspection template could not be loaded. Check your connection and refresh — the form is rendered from the server template and cannot be shown offline yet.'))));
     return steps;
   }
 }
-class _SaveIndicator extends StatelessWidget { const _SaveIndicator({required this.status}); final SaveStatus status; @override Widget build(BuildContext context) { final (String text, Color color) = switch (status) { SaveStatus.idle => ('', Colors.transparent), SaveStatus.saving => ('Saving…', AppColors.textSecondary), SaveStatus.saved => ('Saved', AppColors.success), SaveStatus.failed => ('Not saved', AppColors.danger) }; if (text.isEmpty) return const SizedBox.shrink(); return Padding(padding: const EdgeInsets.only(right: AppSpacing.md), child: Center(child: Text(text, style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w600)))); } }
-class _ProgressBar extends ConsumerWidget { const _ProgressBar({required this.inspectionId, required this.onOpenReview}); final String inspectionId; final VoidCallback onOpenReview; @override Widget build(BuildContext context, WidgetRef ref) { final c = ref.watch(completenessProvider(inspectionId)); final pct = c.valueOrNull?.percentage ?? 0; final outstanding = c.valueOrNull?.outstanding.length ?? 0; return SafeArea(child: Padding(padding: const EdgeInsets.all(AppSpacing.md), child: Column(mainAxisSize: MainAxisSize.min, children: <Widget>[Row(children: <Widget>[Expanded(child: ClipRRect(borderRadius: BorderRadius.circular(8), child: LinearProgressIndicator(value: pct / 100, minHeight: 6, backgroundColor: AppColors.primary.withValues(alpha: 0.12)))), const SizedBox(width: AppSpacing.sm), Text('$pct%', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13))]), const SizedBox(height: AppSpacing.xs), SizedBox(width: double.infinity, child: FilledButton(onPressed: onOpenReview, child: Text(outstanding == 0 ? 'Review & submit' : 'Review · $outstanding outstanding')))]))); } }
-class ReviewPage extends ConsumerStatefulWidget { const ReviewPage({required this.inspectionId, required this.onNavigateToSection, super.key}); final String inspectionId; final ValueChanged<String> onNavigateToSection; @override ConsumerState<ReviewPage> createState() => _ReviewPageState(); }
-class _ReviewPageState extends ConsumerState<ReviewPage> { bool _busy = false; Future<void> _submit(bool resubmit) async { final confirmed = await showDialog<bool>(context: context, builder: (c) => AlertDialog(title: Text(resubmit ? 'Resubmit inspection?' : 'Submit inspection?'), content: Text(resubmit ? 'Your corrections will be sent back to the reviewer for another review.' : 'Once submitted, the inspection will be sent to the reviewer and most inspection information can no longer be edited.'), actions: <Widget>[TextButton(onPressed: () => Navigator.of(c).pop(false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.of(c).pop(true), child: Text(resubmit ? 'Resubmit' : 'Submit'))])); if (!(confirmed ?? false)) return; setState(() => _busy = true); try { final updated = await ref.read(inspectionWorkspaceProvider(widget.inspectionId).notifier).submit(); if (!mounted) return; ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Inspection ${updated.status.label}.'))); context.pop(); } on ApiError catch (e) { if (!mounted) return; ref.invalidate(completenessProvider(widget.inspectionId)); ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message))); } finally { if (mounted) setState(() => _busy = false); } }
-@override Widget build(BuildContext context) { final id = widget.inspectionId; final completeness = ref.watch(completenessProvider(id)); final ws = ref.watch(inspectionWorkspaceProvider(id)).valueOrNull; final status = ws?.inspection.status ?? InspectionStatus.unknown; final canSubmit = status.isEditable; return completeness.when(loading: () => const Center(child: CircularProgressIndicator()), error: (e, _) => ErrorStateView(error: e, onRetry: () => ref.invalidate(completenessProvider(id))), data: (c) => ListView(padding: const EdgeInsets.all(AppSpacing.md), children: <Widget>[Card(child: Padding(padding: const EdgeInsets.all(AppSpacing.lg), child: Column(children: <Widget>[ProgressGauge(percentage: c.percentage, label: c.complete ? 'Ready' : 'In progress'), const SizedBox(height: AppSpacing.sm), Text(c.complete ? 'Inspection ready for submission' : 'Inspection cannot be submitted yet', textAlign: TextAlign.center, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)), if (!c.complete) Text('${c.outstanding.length} item(s) require attention', style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary))]))), const SizedBox(height: AppSpacing.md), if (c.outstanding.isNotEmpty) ...<Widget>[const SectionLabel('Outstanding requirements'), for (final issue in c.outstanding) Padding(padding: const EdgeInsets.only(bottom: AppSpacing.xs), child: AlertTile(title: issue.message, subtitle: <String?>[issue.sectionCode, issue.fieldCode].where((s) => s != null && s.isNotEmpty).join(' · '), icon: Icons.error_outline_rounded, color: issue.blocking ? AppColors.danger : AppColors.warning, onTap: issue.sectionCode == null ? null : () => widget.onNavigateToSection(issue.sectionCode!)))], const SizedBox(height: AppSpacing.md), FilledButton(onPressed: canSubmit && !_busy ? () => _submit(status.isCorrection) : null, child: _busy ? const ButtonSpinner() : Text(status.isCorrection ? 'Resubmit inspection' : 'Submit inspection')), const SizedBox(height: 120)])); } }
+class _SaveIndicator extends StatelessWidget {
+  const _SaveIndicator({required this.status}); final SaveStatus status;
+  @override Widget build(BuildContext context) { final (String text, Color color) = switch (status) { SaveStatus.idle => ('', Colors.transparent), SaveStatus.saving => ('Saving…', AppColors.textSecondary), SaveStatus.saved => ('Saved', AppColors.success), SaveStatus.failed => ('Not saved', AppColors.danger) }; if (text.isEmpty) return const SizedBox.shrink(); return Padding(padding: const EdgeInsets.only(right: AppSpacing.md), child: Center(child: Text(text, style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w600)))); }
+}
+class _ProgressBar extends ConsumerWidget {
+  const _ProgressBar({required this.inspectionId, required this.onOpenReview}); final String inspectionId; final VoidCallback onOpenReview;
+  @override Widget build(BuildContext context, WidgetRef ref) { final c = ref.watch(completenessProvider(inspectionId)); final pct = c.valueOrNull?.percentage ?? 0; final outstanding = c.valueOrNull?.outstanding.length ?? 0; return SafeArea(child: Padding(padding: const EdgeInsets.all(AppSpacing.md), child: Column(mainAxisSize: MainAxisSize.min, children: <Widget>[Row(children: <Widget>[Expanded(child: ClipRRect(borderRadius: BorderRadius.circular(8), child: LinearProgressIndicator(value: pct / 100, minHeight: 6, backgroundColor: AppColors.primary.withValues(alpha: 0.12)))), const SizedBox(width: AppSpacing.sm), Text('$pct%', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13))]), const SizedBox(height: AppSpacing.xs), SizedBox(width: double.infinity, child: FilledButton(onPressed: onOpenReview, child: Text(outstanding == 0 ? 'Review & submit' : 'Review · $outstanding outstanding')))]))); }
+}
+class ReviewPage extends ConsumerStatefulWidget {
+  const ReviewPage({required this.inspectionId, required this.onNavigateToSection, super.key}); final String inspectionId; final ValueChanged<String> onNavigateToSection;
+  @override ConsumerState<ReviewPage> createState() => _ReviewPageState();
+}
+class _ReviewPageState extends ConsumerState<ReviewPage> {
+  bool _busy = false;
+  Future<void> _submit(bool isResubmit) async {
+    final confirmed = await showDialog<bool>(context: context, builder: (c) => AlertDialog(title: Text(isResubmit ? 'Resubmit inspection?' : 'Submit inspection?'), content: Text(isResubmit ? 'Your corrections will be sent back to the reviewer for another review.' : 'Once submitted, the inspection will be sent to the reviewer and most inspection information can no longer be edited.'), actions: <Widget>[TextButton(onPressed: () => Navigator.of(c).pop(false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.of(c).pop(true), child: Text(isResubmit ? 'Resubmit' : 'Submit'))]));
+    if (!(confirmed ?? false)) return; setState(() => _busy = true);
+    try { final updated = await ref.read(inspectionWorkspaceProvider(widget.inspectionId).notifier).submit(); if (!mounted) return; ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Inspection ${updated.status.label}.'))); context.pop(); }
+    on ApiError catch (e) { if (!mounted) return; ref.invalidate(completenessProvider(widget.inspectionId)); ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message))); }
+    finally { if (mounted) setState(() => _busy = false); }
+  }
+  @override Widget build(BuildContext context) {
+    final id = widget.inspectionId; final completeness = ref.watch(completenessProvider(id)); final ws = ref.watch(inspectionWorkspaceProvider(id)).valueOrNull; final status = ws?.inspection.status ?? InspectionStatus.unknown; final canSubmit = status.isEditable;
+    return completeness.when(loading: () => const Center(child: CircularProgressIndicator()), error: (e, _) => ErrorStateView(error: e, onRetry: () => ref.invalidate(completenessProvider(id))), data: (c) => ListView(padding: const EdgeInsets.all(AppSpacing.md), children: <Widget>[Card(child: Padding(padding: const EdgeInsets.all(AppSpacing.lg), child: Column(children: <Widget>[ProgressGauge(percentage: c.percentage, label: c.complete ? 'Ready' : 'In progress'), const SizedBox(height: AppSpacing.sm), Text(c.complete ? 'Inspection ready for submission' : 'Inspection cannot be submitted yet', textAlign: TextAlign.center, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)), if (!c.complete) Padding(padding: const EdgeInsets.only(top: AppSpacing.xxs), child: Text('${c.outstanding.length} item(s) require attention', style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary)))]))), const SizedBox(height: AppSpacing.md), if (c.outstanding.isNotEmpty) ...<Widget>[const SectionLabel('Outstanding requirements'), for (final issue in c.outstanding) Padding(padding: const EdgeInsets.only(bottom: AppSpacing.xs), child: AlertTile(title: issue.message, subtitle: <String?>[issue.sectionCode, issue.fieldCode].where((s) => s != null && s.isNotEmpty).join(' · '), icon: Icons.error_outline_rounded, color: issue.blocking ? AppColors.danger : AppColors.warning, onTap: issue.sectionCode == null ? null : () => widget.onNavigateToSection(issue.sectionCode!)))], const SizedBox(height: AppSpacing.md), FilledButton(onPressed: canSubmit && !_busy ? () => _submit(status.isCorrection) : null, child: _busy ? const ButtonSpinner() : Text(status.isCorrection ? 'Resubmit inspection' : 'Submit inspection')), if (!c.complete) const Padding(padding: EdgeInsets.only(top: AppSpacing.xs), child: Text('The server re-checks completeness at submission. You may attempt submission, but incomplete inspections are rejected.', textAlign: TextAlign.center, style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary))), const SizedBox(height: 120)]));
+  }
+}
