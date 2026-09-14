@@ -75,7 +75,22 @@ class SessionController extends Notifier<SessionState> {
   }) async {
     await _repo.changePassword(
         currentPassword: currentPassword, newPassword: newPassword);
-    state = SessionAuthenticated(await _repo.me());
+
+    // /auth/change-password intentionally returns no user payload. The backend
+    // has already set mustChangePassword=false, so the existing authenticated
+    // session can be updated immediately. Do not call /auth/me here: besides
+    // being unnecessary, doing so can race with token/session refresh and leave
+    // the router stuck on the forced password-change route.
+    final current = state;
+    if (current is SessionAuthenticated) {
+      state = SessionAuthenticated(
+        current.user.copyWith(mustChangePassword: false),
+      );
+    } else {
+      // Defensive fallback for an unexpected state transition. If there is no
+      // authenticated user, restoring from the server remains authoritative.
+      state = SessionAuthenticated(await _repo.me());
+    }
   }
 
   Future<void> logout() async {
