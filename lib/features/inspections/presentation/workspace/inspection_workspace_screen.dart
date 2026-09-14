@@ -71,6 +71,34 @@ class _InspectionWorkspaceScreenState extends ConsumerState<InspectionWorkspaceS
           body: Column(
             children: <Widget>[
               if (!enabled) MessageBanner(message: 'This inspection is ${inspection.status.label.toLowerCase()} and is read-only.', color: AppColors.offline, icon: Icons.lock_outline_rounded),
+              if (inspection.owner?.fullName?.trim().isNotEmpty == true)
+                Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, 0),
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: .06),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.primary.withValues(alpha: .14)),
+                  ),
+                  child: Row(
+                    children: <Widget>[
+                      Icon(Icons.person_outline_rounded, size: 20, color: AppColors.primary),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            const Text('Owner / Client — Inherited from Property', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
+                            const SizedBox(height: 2),
+                            Text(inspection.owner!.fullName!, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.lock_outline_rounded, size: 16, color: AppColors.textSecondary),
+                    ],
+                  ),
+                ),
               SaveStatusBar(inspectionId: id),
               if (inspection.status.isCorrection) const MessageBanner(message: 'Corrections were requested by the reviewer. Update the inspection and resubmit it.', color: AppColors.warning, icon: Icons.report_problem_outlined),
               Expanded(child: steps[safeIndex].builder(context)),
