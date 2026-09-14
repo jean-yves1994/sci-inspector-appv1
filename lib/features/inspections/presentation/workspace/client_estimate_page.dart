@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/sci_widgets.dart';
 import '../../../templates/domain/template.dart';
 import '../../application/inspection_providers.dart';
 import '../../domain/inspection.dart';
