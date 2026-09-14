@@ -53,6 +53,38 @@ class User {
   bool get isInspector => roles.contains('INSPECTOR');
   bool can(String permission) => permissions.contains(permission);
 
+  /// Returns a copy of this user with only the supplied fields changed.
+  ///
+  /// This is important for the first-login password flow: changing the
+  /// password succeeds on the server and clears `mustChangePassword`, but the
+  /// change-password endpoint does not need to return a complete user object.
+  /// The existing authenticated user can therefore be updated locally without
+  /// forcing another `/auth/me` request or another login.
+  User copyWith({
+    String? id,
+    String? email,
+    String? firstName,
+    String? lastName,
+    String? organizationId,
+    String? branchId,
+    String? branchScope,
+    bool? mustChangePassword,
+    List<String>? roles,
+    List<String>? permissions,
+  }) =>
+      User(
+        id: id ?? this.id,
+        email: email ?? this.email,
+        firstName: firstName ?? this.firstName,
+        lastName: lastName ?? this.lastName,
+        organizationId: organizationId ?? this.organizationId,
+        branchId: branchId ?? this.branchId,
+        branchScope: branchScope ?? this.branchScope,
+        mustChangePassword: mustChangePassword ?? this.mustChangePassword,
+        roles: roles ?? this.roles,
+        permissions: permissions ?? this.permissions,
+      );
+
   factory User.fromJson(Map<String, dynamic> j) => User(
         id: j['id'] as String,
         email: j['email'] as String? ?? '',
