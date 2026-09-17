@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/application/session_controller.dart';
 import '../../features/auth/presentation/auth_screens.dart';
 import '../../features/home/home_screen.dart';
+import '../../features/inspections/presentation/inspection_detail_screen_v2.dart';
 import '../../features/inspections/presentation/inspection_screens.dart';
 import '../../features/inspections/presentation/workspace/inspection_workspace_screen.dart';
 import '../../features/notifications/notifications.dart';
@@ -20,8 +21,7 @@ final _shellKey = GlobalKey<NavigatorState>(debugLabel: 'shell');
 
 class _RouterRefresh extends ChangeNotifier {
   _RouterRefresh(Ref ref) {
-    ref.listen<SessionState>(
-        sessionControllerProvider, (_, __) => notifyListeners());
+    ref.listen<SessionState>(sessionControllerProvider, (_, __) => notifyListeners());
   }
 }
 
@@ -48,7 +48,6 @@ final routerProvider = Provider<GoRouter>((ref) {
       }
 
       if (session is SessionAuthenticated) {
-        // Force the password change before any normal app usage.
         if (session.mustChangePassword && loc != Routes.changePassword) {
           return Routes.changePassword;
         }
@@ -65,15 +64,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: Routes.resetPassword,
-        builder: (c, s) =>
-            ResetPasswordScreen(token: s.uri.queryParameters['token']),
+        builder: (c, s) => ResetPasswordScreen(token: s.uri.queryParameters['token']),
       ),
       GoRoute(
         path: Routes.changePassword,
         builder: (_, __) => const ChangePasswordScreen(),
       ),
-
-      // Full-screen routes outside the shell so they cover the bottom nav.
       GoRoute(
         path: Routes.propertyNew,
         parentNavigatorKey: _rootKey,
@@ -82,17 +78,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.propertyDetailPattern,
         parentNavigatorKey: _rootKey,
-        builder: (c, s) =>
-            PropertyDetailScreen(propertyId: s.pathParameters['id']!),
+        builder: (c, s) => PropertyDetailScreen(propertyId: s.pathParameters['id']!),
       ),
       GoRoute(
         path: Routes.inspectionNewPattern,
         parentNavigatorKey: _rootKey,
-        builder: (c, s) =>
-            CreateInspectionScreen(propertyId: s.pathParameters['propertyId']!),
+        builder: (c, s) => CreateInspectionScreen(propertyId: s.pathParameters['propertyId']!),
       ),
-      // Before the ':id' route, same as propertyNew — otherwise go_router
-      // would try to parse 'payment' as part of the id.
       GoRoute(
         path: Routes.inspectionPaymentPattern,
         parentNavigatorKey: _rootKey,
@@ -112,32 +104,17 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.inspectionDetailPattern,
         parentNavigatorKey: _rootKey,
-        builder: (c, s) =>
-            InspectionDetailScreen(inspectionId: s.pathParameters['id']!),
+        builder: (c, s) => InspectionDetailScreenV2(inspectionId: s.pathParameters['id']!),
       ),
-
       ShellRoute(
         navigatorKey: _shellKey,
-        builder: (c, s, child) =>
-            AppShell(location: s.matchedLocation, child: child),
+        builder: (c, s, child) => AppShell(location: s.matchedLocation, child: child),
         routes: <RouteBase>[
           GoRoute(path: Routes.home, builder: (_, __) => const HomeScreen()),
-          GoRoute(
-            path: Routes.inspections,
-            builder: (_, __) => const InspectionListScreen(),
-          ),
-          GoRoute(
-            path: Routes.properties,
-            builder: (_, __) => const PropertyListScreen(),
-          ),
-          GoRoute(
-            path: Routes.notifications,
-            builder: (_, __) => const NotificationsScreen(),
-          ),
-          GoRoute(
-            path: Routes.profile,
-            builder: (_, __) => const ProfileScreen(),
-          ),
+          GoRoute(path: Routes.inspections, builder: (_, __) => const InspectionListScreen()),
+          GoRoute(path: Routes.properties, builder: (_, __) => const PropertyListScreen()),
+          GoRoute(path: Routes.notifications, builder: (_, __) => const NotificationsScreen()),
+          GoRoute(path: Routes.profile, builder: (_, __) => const ProfileScreen()),
         ],
       ),
     ],
