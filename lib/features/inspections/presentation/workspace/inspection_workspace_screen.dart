@@ -42,7 +42,7 @@ class _InspectionWorkspaceScreenState extends ConsumerState<InspectionWorkspaceS
         final inspection = ws.inspection;
         final template = ws.template;
         final enabled = inspection.isEditable;
-        final steps = _buildSteps(template, enabled);
+        final steps = _buildSteps(template, enabled, inspection);
         _stepCodes = steps.map((s) => s.code).toList();
         if (!_jumped && widget.initialSection != null) {
           _jumped = true;
@@ -110,11 +110,29 @@ class _InspectionWorkspaceScreenState extends ConsumerState<InspectionWorkspaceS
     );
   }
 
-  List<_Step> _buildSteps(InspectionTemplate? template, bool enabled) {
+  List<_Step> _buildSteps(
+    InspectionTemplate? template,
+    bool enabled,
+    Inspection inspection,
+  ) {
     final id = widget.inspectionId;
-    final steps = <_Step>[];
-    for (final s in template?.fieldSections ?? const <TemplateSection>[]) {
-      final title = switch (s.code) {
+    final sections = template?.fieldSections ?? const <TemplateSection>[];
+
+    final valuesById = <String, InspectionValue>{
+      for (final value in inspection.values) value.fieldId: value,
+    };
+    final fieldsByCode = <String, TemplateField>{
+      for (final section in template?.sections ?? const <TemplateSection>[])
+        for (final field in section.fields) field.code: field,
+    };
+
+    final annexCountField = fieldsByCode['ANNEX_COUNT'];
+    final annexCountValue =
+        annexCountField == null ? null : valuesById[annexCountField.id];
+    final annexCount = annexCountValue?.valueNumber?.round() ?? 0;
+
+    _Step makeStep(TemplateSection section) {
+      final title = switch (section.code) {
         'CLASSIFICATION' => 'Classification',
         'VACANT_LAND' => 'Land description',
         'MAIN_BUILDING' => 'Main building',
@@ -122,17 +140,108 @@ class _InspectionWorkspaceScreenState extends ConsumerState<InspectionWorkspaceS
         'LAND_VALUATION' => 'Land estimate',
         'IMPROVED_VALUATION' => 'Property estimate',
         'EVIDENCE_DOCUMENTS' => 'Documents',
-        _ => s.name,
+        _ => section.name,
       };
-      steps.add(_Step(title: title, code: s.code, builder: (_) => ConditionalTemplateSectionPage(inspectionId: id, section: s, enabled: enabled)));
+
+      final annexNumber = section.code.startsWith('ANNEX_')
+          ? int.tryParse(section.code.substring('ANNEX_'.length))
+          : null;
+
+      return _Step(
+        title: annexNumber == null ? title : 'Annex $annexNumber',
+        code: section.code,
+        builder: (_) => ConditionalTemplateSectionPage(
+          inspectionId: id,
+          section: section,
+          enabled: enabled,
+        ),
+      );
     }
+
+    final steps = <_Step>[];
+    var buildingGroupInserted = false;
+
+    for (final section in sections) {
+      final isAnnex = section.code.startsWith('ANNEX_');
+      final isAdditionalBuildings = section.code == 'ADDITIONAL_BUILDINGS';
+
+      // The individual Annex sections replace the old generic "Annexes"
+      // section in the top navigation.
+      if (isAdditionalBuildings || isAnnex) continue;
+
+      steps.add(makeStep(section));
+
+      // Keep Main Building and the selected Annexes together as adjacent tabs.
+      if (section.code == 'MAIN_BUILDING') {
+        buildingGroupInserted = true;
+        for (var i = 1; i <= annexCount; i++) {
+          final annexCode = 'ANNEX_$i';
+          final annexSection = sections.cast<TemplateSection?>().firstWhere(
+                (candidate) => candidate?.code == annexCode,
+                orElse: () => null,
+              );
+          if (annexSection != null) {
+            steps.add(makeStep(annexSection));
+          }
+        }
+      }
+    }
+
+    // If a template places Annex sections without a Main Building section,
+    // don't lose them from navigation.
+    if (!buildingGroupInserted) {
+      for (final section in sections) {
+        if (!section.code.startsWith('ANNEX_')) continue;
+        final number = int.tryParse(section.code.substring('ANNEX_'.length));
+        if (number != null && number <= annexCount) {
+          steps.add(makeStep(section));
+        }
+      }
+    }
+
     final assessments = template?.assessmentSections ?? const <TemplateSection>[];
-    if (assessments.isNotEmpty) steps.add(_Step(title: 'Condition', code: 'ASSESSMENTS', builder: (_) => AssessmentsPage(inspectionId: id, sections: assessments, enabled: enabled)));
+    if (assessments.isNotEmpty) {
+      steps.add(
+        _Step(
+          title: 'Condition',
+          code: 'ASSESSMENTS',
+          builder: (_) => AssessmentsPage(
+            inspectionId: id,
+            sections: assessments,
+            enabled: enabled,
+          ),
+        ),
+      );
+    }
+
     steps.addAll(<_Step>[
-      _Step(title: 'GPS location', code: 'LOCATION', builder: (_) => LocationPage(inspectionId: id, enabled: enabled)),
-      _Step(title: 'Photos', code: 'PHOTOS', builder: (_) => PhotosPage(inspectionId: id, rules: template?.photoRules ?? const <TemplatePhotoRule>[], enabled: enabled)),
-      _Step(title: 'Review & submit', code: 'REVIEW', builder: (_) => ReviewPage(inspectionId: id, onNavigateToSection: (code) { final i = _stepCodes.indexOf(code.toUpperCase()); if (i >= 0) setState(() => _index = i); })),
+      _Step(
+        title: 'GPS location',
+        code: 'LOCATION',
+        builder: (_) => LocationPage(inspectionId: id, enabled: enabled),
+      ),
+      _Step(
+        title: 'Photos',
+        code: 'PHOTOS',
+        builder: (_) => PhotosPage(
+          inspectionId: id,
+          rules: template?.photoRules ?? const <TemplatePhotoRule>[],
+          enabled: enabled,
+        ),
+      ),
+      _Step(
+        title: 'Review & submit',
+        code: 'REVIEW',
+        builder: (_) => ReviewPage(
+          inspectionId: id,
+          onNavigateToSection: (code) {
+            final i = _stepCodes.indexOf(code.toUpperCase());
+            if (i >= 0) setState(() => _index = i);
+          },
+        ),
+      ),
     ]);
+
     return steps;
   }
 }
