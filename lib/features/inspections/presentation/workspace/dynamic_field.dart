@@ -49,6 +49,8 @@ class _DynamicInspectionFieldState extends State<DynamicInspectionField> {
     super.dispose();
   }
 
+  bool get _fieldEnabled => widget.enabled && !widget.field.isReadOnly;
+
   bool get _isTextual => const <FieldType>{
         FieldType.text,
         FieldType.textarea,
@@ -108,7 +110,13 @@ class _DynamicInspectionFieldState extends State<DynamicInspectionField> {
           ),
           const SizedBox(height: AppSpacing.xs),
           _control(context),
-          if (widget.field.helpText != null) ...<Widget>[
+          if (widget.field.isComputed) ...<Widget>[
+            const SizedBox(height: AppSpacing.xxs),
+            const Text(
+              'Automatically calculated from the valuation amounts above.',
+              style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+            ),
+          ] else if (widget.field.helpText != null) ...<Widget>[
             const SizedBox(height: AppSpacing.xxs),
             Text(
               widget.field.helpText!,
@@ -128,7 +136,7 @@ class _DynamicInspectionFieldState extends State<DynamicInspectionField> {
       case FieldType.textarea:
         return TextFormField(
           controller: _controller,
-          enabled: widget.enabled,
+          enabled: _fieldEnabled,
           maxLines: 4,
           onChanged: _emit,
           decoration: const InputDecoration(hintText: 'Enter details'),
@@ -137,7 +145,7 @@ class _DynamicInspectionFieldState extends State<DynamicInspectionField> {
       case FieldType.number:
         return TextFormField(
           controller: _controller,
-          enabled: widget.enabled,
+          enabled: _fieldEnabled,
           keyboardType:
               const TextInputType.numberWithOptions(decimal: true),
           inputFormatters: <TextInputFormatter>[
@@ -150,7 +158,7 @@ class _DynamicInspectionFieldState extends State<DynamicInspectionField> {
       case FieldType.currency:
         return TextFormField(
           controller: _controller,
-          enabled: widget.enabled,
+          enabled: _fieldEnabled,
           keyboardType:
               const TextInputType.numberWithOptions(decimal: true),
           inputFormatters: <TextInputFormatter>[
@@ -166,7 +174,7 @@ class _DynamicInspectionFieldState extends State<DynamicInspectionField> {
       case FieldType.date:
         final d = widget.value?.valueDate;
         return InkWell(
-          onTap: widget.enabled ? () => _pickDate(context) : null,
+          onTap: _fieldEnabled ? () => _pickDate(context) : null,
           borderRadius: BorderRadius.circular(AppRadius.md),
           child: InputDecorator(
             decoration: const InputDecoration(
@@ -195,7 +203,7 @@ class _DynamicInspectionFieldState extends State<DynamicInspectionField> {
             for (final o in widget.field.options)
               DropdownMenuItem<String>(value: o, child: Text(o)),
           ],
-          onChanged: widget.enabled ? _emit : null,
+          onChanged: _fieldEnabled ? _emit : null,
         );
 
       case FieldType.multiSelect:
@@ -208,7 +216,7 @@ class _DynamicInspectionFieldState extends State<DynamicInspectionField> {
               FilterChip(
                 label: Text(o),
                 selected: selected.contains(o),
-                onSelected: widget.enabled
+                onSelected: _fieldEnabled
                     ? (on) {
                         final next = <String>{...selected};
                         on ? next.add(o) : next.remove(o);
@@ -223,7 +231,7 @@ class _DynamicInspectionFieldState extends State<DynamicInspectionField> {
         final on = widget.value?.valueBool ?? false;
         return SwitchListTile.adaptive(
           value: on,
-          onChanged: widget.enabled ? _emit : null,
+          onChanged: _fieldEnabled ? _emit : null,
           title: Text(
             on ? 'Yes' : 'No',
             style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
@@ -234,7 +242,7 @@ class _DynamicInspectionFieldState extends State<DynamicInspectionField> {
       case FieldType.phone:
         return TextFormField(
           controller: _controller,
-          enabled: widget.enabled,
+          enabled: _fieldEnabled,
           keyboardType: TextInputType.phone,
           onChanged: _emit,
           decoration: const InputDecoration(hintText: '+250 7XX XXX XXX'),
@@ -243,7 +251,7 @@ class _DynamicInspectionFieldState extends State<DynamicInspectionField> {
       case FieldType.email:
         return TextFormField(
           controller: _controller,
-          enabled: widget.enabled,
+          enabled: _fieldEnabled,
           keyboardType: TextInputType.emailAddress,
           onChanged: _emit,
           decoration: const InputDecoration(hintText: 'name@example.com'),
@@ -251,7 +259,7 @@ class _DynamicInspectionFieldState extends State<DynamicInspectionField> {
 
       case FieldType.nationalId:
         // Masked unless actively revealed; never shown casually.
-        if (!_revealNationalId && !widget.enabled) {
+        if (!_revealNationalId && !_fieldEnabled) {
           return InputDecorator(
             decoration: const InputDecoration(),
             child: Text(maskNationalId(widget.value?.valueText)),
@@ -259,7 +267,7 @@ class _DynamicInspectionFieldState extends State<DynamicInspectionField> {
         }
         return TextFormField(
           controller: _controller,
-          enabled: widget.enabled,
+          enabled: _fieldEnabled,
           obscureText: !_revealNationalId,
           keyboardType: TextInputType.number,
           onChanged: _emit,
@@ -282,7 +290,7 @@ class _DynamicInspectionFieldState extends State<DynamicInspectionField> {
       case FieldType.text:
         return TextFormField(
           controller: _controller,
-          enabled: widget.enabled,
+          enabled: _fieldEnabled,
           onChanged: _emit,
           decoration: const InputDecoration(hintText: 'Enter value'),
         );
