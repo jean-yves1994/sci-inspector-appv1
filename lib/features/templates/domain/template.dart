@@ -16,7 +16,12 @@ class TemplateField {
     return TemplateField(id: j['id'] as String, code: j['code'] as String? ?? '', label: j['label'] as String? ?? j['code'] as String? ?? 'Field', type: FieldType.parse(j['type'] as String?), required: j['required'] as bool? ?? false, sortOrder: (j['sortOrder'] as num?)?.toInt() ?? 0, options: options, helpText: j['helpText'] as String?, validation: validation);
   }
 
-  bool isVisible(Map<String, dynamic> valuesByCode) => _matchesVisibility(validation?['visibleWhen'], valuesByCode);
+  bool isVisible(Map<String, dynamic> valuesByCode) =>
+      validation?['hidden'] != true &&
+      _matchesVisibility(validation?['visibleWhen'], valuesByCode);
+
+  bool get isComputed => validation?['computed'] == true;
+  bool get isReadOnly => validation?['readOnly'] == true || isComputed;
 
   static bool _matchesVisibility(dynamic rule, Map<String, dynamic> values) {
     if (rule is! Map) return true;
