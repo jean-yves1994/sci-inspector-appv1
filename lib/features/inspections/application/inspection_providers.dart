@@ -408,6 +408,11 @@ class InspectionWorkspaceNotifier
     } else {
       values.add(value);
     }
+
+    // Keep computed totals in the same local state and batched save as the
+    // edited amount. No extra API request is made for valuation calculation.
+    _recalculateValuationTotals(values);
+
     final nextCompleteness = _optimisticCompleteness(
       fieldCode: value.fieldId,
       sectionCode: sectionCode,
@@ -423,6 +428,60 @@ class InspectionWorkspaceNotifier
 
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 800), flush);
+  }
+
+  double? _numberForCode(
+    String code,
+    Map<String, TemplateField> fieldsByCode,
+    List<InspectionValue> values,
+  ) {
+    final field = fieldsByCode[code];
+    if (field == null) return null;
+    for (final value in values) {
+      if (value.fieldId == field.id) return value.valueNumber;
+    }
+    return null;
+  }
+
+  void _recalculateValuationTotals(List<InspectionValue> values) {
+    final template = _s.template ?? _s.inspection.template;
+    if (template == null) return;
+
+    final fieldsByCode = <String, TemplateField>{
+      for (final section in template.sections)
+        for (final field in section.fields) field.code: field,
+    };
+
+    final land = _numberForCode('IMPROVED_LAND_VALUE', fieldsByCode, values);
+    final main = _numberForCode('MAIN_BUILDING_VALUE', fieldsByCode, values);
+    final annexValues = <double?>[
+      for (var i = 1; i <= 4; i++)
+        _numberForCode('ANNEX_${i}_VALUE', fieldsByCode, values),
+    ];
+    final hasAnyValuation = land != null || main != null ||
+        annexValues.any((value) => value != null);
+    final annexTotal = hasAnyValuation
+        ? annexValues.fold<double>(0, (sum, value) => sum + (value ?? 0))
+        : null;
+    final total = hasAnyValuation
+        ? (land ?? 0) + (main ?? 0) + (annexTotal ?? 0)
+        : null;
+
+    void setComputed(String code, double? number) {
+      final field = fieldsByCode[code];
+      if (field == null) return;
+      final computed = InspectionValue(fieldId: field.id, valueNumber: number);
+      _dirty[field.id] = computed;
+      final index = values.indexWhere((value) => value.fieldId == field.id);
+      if (index >= 0) {
+        values[index] = computed;
+      } else {
+        values.add(computed);
+      }
+    }
+
+    setComputed('ANNEX_TOTAL_VALUE', annexTotal);
+    setComputed('IMPROVED_TOTAL_VALUE', total);
   }
 
   /// Sends pending field values. Safe to call concurrently.
