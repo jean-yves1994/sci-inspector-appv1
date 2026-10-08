@@ -14,6 +14,64 @@ import '../data/inspection_reports_repository.dart';
 import '../domain/inspection.dart';
 import '../domain/inspection_status.dart';
 
+class PaymentStatusBadge extends ConsumerWidget {
+  const PaymentStatusBadge({required this.inspectionId, super.key});
+  final String inspectionId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final payment = ref.watch(paymentControllerProvider(inspectionId));
+    final state = payment.valueOrNull;
+    final status = state?.status;
+    final label = status == null
+        ? 'Payment status unavailable'
+        : switch (status) {
+            PaymentStatus.paid => 'Payment confirmed',
+            PaymentStatus.pending => 'Payment pending',
+            PaymentStatus.processing => 'Payment processing',
+            PaymentStatus.failed => 'Payment failed',
+            PaymentStatus.cancelled => 'Payment cancelled',
+          };
+    final color = status?.unlocksInspection == true
+        ? AppColors.success
+        : status == PaymentStatus.failed || status == PaymentStatus.cancelled
+            ? AppColors.danger
+            : AppColors.warning;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.xs,
+      ),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: .10),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Icon(
+            status?.unlocksInspection == true
+                ? Icons.check_circle_outline_rounded
+                : Icons.payments_outlined,
+            size: 16,
+            color: color,
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class InspectionDetailScreenV2 extends ConsumerWidget {
   const InspectionDetailScreenV2({required this.inspectionId, super.key});
   final String inspectionId;
