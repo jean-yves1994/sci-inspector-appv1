@@ -45,7 +45,7 @@ class ClientEstimatePage extends ConsumerWidget {
           labelText: label,
           suffixText: 'RWF',
           filled: true,
-          fillColor: AppColors.surface2,
+          fillColor: AppColors.surfaceLight,
         ),
         child: Text(
           formatted,
