@@ -6,6 +6,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/sci_widgets.dart';
 import '../../../templates/domain/template.dart';
 import '../../application/inspection_providers.dart';
+import '../../domain/inspection.dart';
 import '../../domain/inspection_status.dart';
 import 'client_estimate_page.dart';
 import 'conditional_template_section_page.dart';
