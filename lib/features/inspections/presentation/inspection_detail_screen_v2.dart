@@ -9,6 +9,7 @@ import '../../../core/network/api_error.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/sci_widgets.dart';
 import '../../payments/application/payment_controller.dart';
+import '../../payments/domain/payment.dart';
 import '../application/inspection_providers.dart';
 import '../data/inspection_reports_repository.dart';
 import '../domain/inspection.dart';
@@ -26,7 +27,7 @@ class PaymentStatusBadge extends ConsumerWidget {
     final label = status == null
         ? 'Payment status unavailable'
         : switch (status) {
-            PaymentStatus.paid => 'Payment confirmed',
+            PaymentStatus.successful => 'Payment confirmed',
             PaymentStatus.pending => 'Payment pending',
             PaymentStatus.processing => 'Payment processing',
             PaymentStatus.failed => 'Payment failed',
