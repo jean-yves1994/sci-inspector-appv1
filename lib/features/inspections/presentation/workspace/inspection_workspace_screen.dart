@@ -43,14 +43,34 @@ class _InspectionWorkspaceScreenState extends ConsumerState<InspectionWorkspaceS
         final inspection = ws.inspection;
         final template = ws.template;
         final enabled = inspection.isEditable;
+
+        // Preserve the active section by code when classification changes the
+        // available tabs. If that section becomes hidden, return to Classification.
+        final previousSectionCode =
+            _index >= 0 && _index < _stepCodes.length ? _stepCodes[_index] : null;
         final steps = _buildSteps(template, enabled, inspection);
+        final matchingIndex = previousSectionCode == null
+            ? -1
+            : steps.indexWhere((step) => step.code == previousSectionCode);
+        final classificationIndex =
+            steps.indexWhere((step) => step.code == 'CLASSIFICATION');
+        final activeIndex = matchingIndex >= 0
+            ? matchingIndex
+            : (classificationIndex >= 0 ? classificationIndex : 0);
         _stepCodes = steps.map((s) => s.code).toList();
+        if (activeIndex != _index) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && _index != activeIndex) {
+              setState(() => _index = activeIndex);
+            }
+          });
+        }
         if (!_jumped && widget.initialSection != null) {
           _jumped = true;
           final target = steps.indexWhere((s) => s.code == widget.initialSection!.toUpperCase());
           if (target >= 0) WidgetsBinding.instance.addPostFrameCallback((_) => setState(() => _index = target));
         }
-        final safeIndex = _index.clamp(0, steps.length - 1);
+        final safeIndex = activeIndex.clamp(0, steps.length - 1);
         return Scaffold(
           appBar: AppBar(
             title: Text(inspection.inspectionNumber ?? 'Inspection'),
@@ -132,6 +152,19 @@ class _InspectionWorkspaceScreenState extends ConsumerState<InspectionWorkspaceS
         annexCountField == null ? null : valuesById[annexCountField.id];
     final annexCount = annexCountValue?.valueNumber?.round() ?? 0;
 
+    // PROPERTY_STATUS is stored as VACANT_PLOT for land-only inspections and
+    // IMPROVED when the property has a building. Match the backend template's
+    // actual option values instead of relying on display labels.
+    final propertyStatusField = fieldsByCode['PROPERTY_STATUS'];
+    final propertyStatus = propertyStatusField == null
+        ? null
+        : valuesById[propertyStatusField.id]?.valueText?.trim().toUpperCase();
+    final isVacantLand = const <String>{
+      'VACANT_PLOT',
+      'LAND',
+      'VACANT LAND',
+    }.contains(propertyStatus);
+
     _Step makeStep(TemplateSection section) {
       final title = switch (section.code) {
         'CLASSIFICATION' => 'Classification',
@@ -165,6 +198,18 @@ class _InspectionWorkspaceScreenState extends ConsumerState<InspectionWorkspaceS
     for (final section in sections) {
       final isAnnex = section.code.startsWith('ANNEX_');
       final isAdditionalBuildings = section.code == 'ADDITIONAL_BUILDINGS';
+      final isBuildingSection = section.code == 'MAIN_BUILDING';
+      final isImprovedValuation = section.code == 'IMPROVED_VALUATION';
+
+      // Land-only inspections do not include building, annex, or improved
+      // valuation tabs. Their land description and land valuation remain visible.
+      if (isVacantLand &&
+          (isBuildingSection ||
+              isAdditionalBuildings ||
+              isAnnex ||
+              isImprovedValuation)) {
+        continue;
+      }
 
       // The individual Annex sections replace the old generic "Annexes"
       // section in the top navigation.
@@ -190,7 +235,7 @@ class _InspectionWorkspaceScreenState extends ConsumerState<InspectionWorkspaceS
 
     // If a template places Annex sections without a Main Building section,
     // don't lose them from navigation.
-    if (!buildingGroupInserted) {
+    if (!buildingGroupInserted && !isVacantLand) {
       for (final section in sections) {
         if (!section.code.startsWith('ANNEX_')) continue;
         final number = int.tryParse(section.code.substring('ANNEX_'.length));
