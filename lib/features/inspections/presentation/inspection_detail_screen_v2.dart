@@ -32,6 +32,7 @@ class PaymentStatusBadge extends ConsumerWidget {
             PaymentStatus.processing => 'Payment processing',
             PaymentStatus.failed => 'Payment failed',
             PaymentStatus.cancelled => 'Payment cancelled',
+            PaymentStatus.unknown => 'Payment status unknown',
           };
     final color = status?.unlocksInspection == true
         ? AppColors.success
