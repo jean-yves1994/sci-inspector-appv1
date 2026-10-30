@@ -32,119 +32,6 @@ class _PropertyListScreenState extends ConsumerState<PropertyListScreen> {
   }
 
   @override
-  void initState() {
-    super.initState();
-    _loadProvinces();
-  }
-
-  Future<void> _loadProvinces() async {
-    try {
-      final items = await ref.read(rwandaLocationsRepositoryProvider).provinces();
-      if (!mounted) return;
-      setState(() { _provinces = items; _locationsLoading = false; _locationError = null; });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() { _locationsLoading = false; _locationError = 'Unable to load locations. Check your connection and retry.'; });
-    }
-  }
-
-  Future<void> _selectProvince(RwandaLocation? value) async {
-    setState(() {
-      _province = value?.name; _provinceCode = value?.code;
-      _district = null; _districtCode = null; _districts = [];
-      _sector = null; _sectorCode = null; _sectors = [];
-      _cell = null; _cells = [];
-      _locationError = null;
-    });
-    if (value == null) return;
-    try {
-      final items = await ref.read(rwandaLocationsRepositoryProvider).districts(value.code);
-      if (mounted && _provinceCode == value.code) setState(() => _districts = items);
-    } catch (_) { if (mounted) setState(() => _locationError = 'Could not load districts. Please retry.'); }
-  }
-
-  Future<void> _selectDistrict(RwandaLocation? value) async {
-    setState(() {
-      _district = value?.name; _districtCode = value?.code;
-      _sector = null; _sectorCode = null; _sectors = [];
-      _cell = null; _cells = []; _locationError = null;
-    });
-    if (value == null) return;
-    try {
-      final items = await ref.read(rwandaLocationsRepositoryProvider).sectors(value.code);
-      if (mounted && _districtCode == value.code) setState(() => _sectors = items);
-    } catch (_) { if (mounted) setState(() => _locationError = 'Could not load sectors. Please retry.'); }
-  }
-
-  Future<void> _selectSector(RwandaLocation? value) async {
-    setState(() {
-      _sector = value?.name; _sectorCode = value?.code;
-      _cell = null; _cells = []; _locationError = null;
-    });
-    if (value == null) return;
-    try {
-      final items = await ref.read(rwandaLocationsRepositoryProvider).cells(value.code);
-      if (mounted && _sectorCode == value.code) setState(() => _cells = items);
-    } catch (_) { if (mounted) setState(() => _locationError = 'Could not load cells. Please retry.'); }
-  }
-
-  Future<void> _selectCell(RwandaLocation value) async {
-    setState(() => _cell = value.name);
-  }
-
-  Future<void> _reloadCurrentLevel() async {
-    if (_provinceCode == null) return _loadProvinces();
-    if (_districtCode == null) return _selectProvince(_provinces.firstWhere((e) => e.code == _provinceCode));
-    if (_sectorCode == null) return _selectDistrict(_districts.firstWhere((e) => e.code == _districtCode));
-    return _selectSector(_sectors.firstWhere((e) => e.code == _sectorCode));
-  }
-
-  Future<void> _chooseLocation({
-    required String label,
-    required List<RwandaLocation> items,
-    required String? selected,
-    required ValueChanged<RwandaLocation> onSelected,
-    bool searchable = false,
-  }) async {
-    final picked = await showModalBottomSheet<RwandaLocation>(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => _LocationPickerSheet(title: label, items: items, searchable: searchable),
-    );
-    if (picked != null) onSelected(picked);
-  }
-
-  Widget _locationField({
-    required String label,
-    required String? value,
-    required List<RwandaLocation> items,
-    required VoidCallback? onTap,
-    required String? Function(String?) validator,
-    required IconData icon,
-  }) => FormField<String>(
-    key: ValueKey<String?>(value),
-    initialValue: value,
-    validator: validator,
-    builder: (field) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(label, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
-      const SizedBox(height: AppSpacing.xs),
-      InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        child: InputDecorator(
-          decoration: InputDecoration(
-            prefixIcon: Icon(icon, size: 20),
-            hintText: 'Select ${label.toLowerCase()}',
-            errorText: field.errorText,
-            suffixIcon: const Icon(Icons.arrow_drop_down_rounded),
-          ),
-          child: Text(value ?? '', style: TextStyle(color: value == null ? AppColors.textSecondary : AppColors.textPrimary)),
-        ),
-      ),
-    ]),
-  );
-
-  @override
   void dispose() {
     _scroll
       ..removeListener(_onScroll)
@@ -579,6 +466,119 @@ class _CreatePropertyScreenState extends ConsumerState<CreatePropertyScreen> {
   PropertyType? _type;
   bool _busy = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProvinces();
+  }
+
+  Future<void> _loadProvinces() async {
+    try {
+      final items = await ref.read(rwandaLocationsRepositoryProvider).provinces();
+      if (!mounted) return;
+      setState(() { _provinces = items; _locationsLoading = false; _locationError = null; });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() { _locationsLoading = false; _locationError = 'Unable to load locations. Check your connection and retry.'; });
+    }
+  }
+
+  Future<void> _selectProvince(RwandaLocation? value) async {
+    setState(() {
+      _province = value?.name; _provinceCode = value?.code;
+      _district = null; _districtCode = null; _districts = [];
+      _sector = null; _sectorCode = null; _sectors = [];
+      _cell = null; _cells = [];
+      _locationError = null;
+    });
+    if (value == null) return;
+    try {
+      final items = await ref.read(rwandaLocationsRepositoryProvider).districts(value.code);
+      if (mounted && _provinceCode == value.code) setState(() => _districts = items);
+    } catch (_) { if (mounted) setState(() => _locationError = 'Could not load districts. Please retry.'); }
+  }
+
+  Future<void> _selectDistrict(RwandaLocation? value) async {
+    setState(() {
+      _district = value?.name; _districtCode = value?.code;
+      _sector = null; _sectorCode = null; _sectors = [];
+      _cell = null; _cells = []; _locationError = null;
+    });
+    if (value == null) return;
+    try {
+      final items = await ref.read(rwandaLocationsRepositoryProvider).sectors(value.code);
+      if (mounted && _districtCode == value.code) setState(() => _sectors = items);
+    } catch (_) { if (mounted) setState(() => _locationError = 'Could not load sectors. Please retry.'); }
+  }
+
+  Future<void> _selectSector(RwandaLocation? value) async {
+    setState(() {
+      _sector = value?.name; _sectorCode = value?.code;
+      _cell = null; _cells = []; _locationError = null;
+    });
+    if (value == null) return;
+    try {
+      final items = await ref.read(rwandaLocationsRepositoryProvider).cells(value.code);
+      if (mounted && _sectorCode == value.code) setState(() => _cells = items);
+    } catch (_) { if (mounted) setState(() => _locationError = 'Could not load cells. Please retry.'); }
+  }
+
+  Future<void> _selectCell(RwandaLocation value) async {
+    setState(() => _cell = value.name);
+  }
+
+  Future<void> _reloadCurrentLevel() async {
+    if (_provinceCode == null) return _loadProvinces();
+    if (_districtCode == null) return _selectProvince(_provinces.firstWhere((e) => e.code == _provinceCode));
+    if (_sectorCode == null) return _selectDistrict(_districts.firstWhere((e) => e.code == _districtCode));
+    return _selectSector(_sectors.firstWhere((e) => e.code == _sectorCode));
+  }
+
+  Future<void> _chooseLocation({
+    required String label,
+    required List<RwandaLocation> items,
+    required String? selected,
+    required ValueChanged<RwandaLocation> onSelected,
+    bool searchable = false,
+  }) async {
+    final picked = await showModalBottomSheet<RwandaLocation>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _LocationPickerSheet(title: label, items: items, searchable: searchable),
+    );
+    if (picked != null) onSelected(picked);
+  }
+
+  Widget _locationField({
+    required String label,
+    required String? value,
+    required List<RwandaLocation> items,
+    required VoidCallback? onTap,
+    required String? Function(String?) validator,
+    required IconData icon,
+  }) => FormField<String>(
+    key: ValueKey<String?>(value),
+    initialValue: value,
+    validator: validator,
+    builder: (field) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(label, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
+      const SizedBox(height: AppSpacing.xs),
+      InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        child: InputDecorator(
+          decoration: InputDecoration(
+            prefixIcon: Icon(icon, size: 20),
+            hintText: 'Select ${label.toLowerCase()}',
+            errorText: field.errorText,
+            suffixIcon: const Icon(Icons.arrow_drop_down_rounded),
+          ),
+          child: Text(value ?? '', style: TextStyle(color: value == null ? AppColors.textSecondary : AppColors.textPrimary)),
+        ),
+      ),
+    ]),
+  );
 
   @override
   void dispose() {
