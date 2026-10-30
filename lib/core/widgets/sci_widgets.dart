@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../network/api_error.dart';
 import '../theme/app_theme.dart';
@@ -461,6 +462,7 @@ class SciTextField extends StatelessWidget {
     this.maxLines = 1,
     this.autofillHints,
     this.helper,
+    this.inputFormatters,
     super.key,
   });
 
@@ -484,6 +486,7 @@ class SciTextField extends StatelessWidget {
   final int maxLines;
   final Iterable<String>? autofillHints;
   final String? helper;
+  final List<TextInputFormatter>? inputFormatters;
 
   @override
   Widget build(BuildContext context) {
@@ -512,6 +515,7 @@ class SciTextField extends StatelessWidget {
           onFieldSubmitted: onFieldSubmitted,
           onChanged: onChanged,
           autofillHints: autofillHints,
+          inputFormatters: inputFormatters,
           autocorrect: false,
           decoration: InputDecoration(
             hintText: hint,
