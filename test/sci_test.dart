@@ -126,9 +126,8 @@ void main() {
   });
 
   group('CreatePropertyRequest', () {
-    CreatePropertyRequest build({String? ref, String? village}) =>
+    CreatePropertyRequest build({String? titleNumber, String? village}) =>
         CreatePropertyRequest(
-          reference: ref,
           name: 'Kigali Commercial Building',
           propertyType: PropertyType.commercial,
           ownerClientName: 'John Doe',
@@ -137,11 +136,12 @@ void main() {
           sector: 'Kimironko',
           cell: 'Nyagatovu',
           villageStreet: village,
+          titleNumber: titleNumber,
         );
 
     test('omits blank optionals (forbidNonWhitelisted safety)', () {
-      final j = build(ref: '   ', village: '').toJson();
-      expect(j.containsKey('reference'), isFalse);
+      final j = build(titleNumber: '   ', village: '').toJson();
+      expect(j.containsKey('titleNumber'), isFalse);
       expect(j.containsKey('villageStreet'), isFalse);
     });
 
@@ -153,9 +153,9 @@ void main() {
     });
 
     test('never sends legacy fields', () {
-      final j = build(ref: 'PROP-2026-0001').toJson();
+      final j = build(titleNumber: 'PROP-2026-0001').toJson();
       for (final f in <String>[
-        'plotNumber', 'titleNumber', 'latitude', 'longitude', 'addressLine',
+        'plotNumber', 'reference', 'latitude', 'longitude', 'addressLine',
       ]) {
         expect(j.containsKey(f), isFalse, reason: '$f must not be sent');
       }
