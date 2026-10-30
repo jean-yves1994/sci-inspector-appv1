@@ -558,7 +558,7 @@ class _CreatePropertyScreenState extends ConsumerState<CreatePropertyScreen> {
     required String? Function(String?) validator,
     required IconData icon,
   }) => FormField<String>(
-    key: ValueKey<String?>(value),
+    key: ValueKey<String>('$label:${value ?? 'unselected'}'),
     initialValue: value,
     validator: validator,
     builder: (field) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
