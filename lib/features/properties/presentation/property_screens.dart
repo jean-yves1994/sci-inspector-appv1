@@ -13,6 +13,7 @@ import '../../auth/domain/user.dart';
 import '../../inspections/domain/inspection_status.dart';
 import '../application/property_providers.dart';
 import '../data/properties_repository.dart';
+import '../data/rwanda_locations_repository.dart';
 import '../domain/property.dart';
 
 class PropertyListScreen extends ConsumerStatefulWidget {
@@ -29,6 +30,118 @@ class _PropertyListScreenState extends ConsumerState<PropertyListScreen> {
     super.initState();
     _scroll.addListener(_onScroll);
   }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProvinces();
+  }
+
+  Future<void> _loadProvinces() async {
+    try {
+      final items = await ref.read(rwandaLocationsRepositoryProvider).provinces();
+      if (!mounted) return;
+      setState(() { _provinces = items; _locationsLoading = false; _locationError = null; });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() { _locationsLoading = false; _locationError = 'Unable to load locations. Check your connection and retry.'; });
+    }
+  }
+
+  Future<void> _selectProvince(RwandaLocation? value) async {
+    setState(() {
+      _province = value?.name; _provinceCode = value?.code;
+      _district = null; _districtCode = null; _districts = [];
+      _sector = null; _sectorCode = null; _sectors = [];
+      _cell = null; _cells = [];
+      _locationError = null;
+    });
+    if (value == null) return;
+    try {
+      final items = await ref.read(rwandaLocationsRepositoryProvider).districts(value.code);
+      if (mounted && _provinceCode == value.code) setState(() => _districts = items);
+    } catch (_) { if (mounted) setState(() => _locationError = 'Could not load districts. Please retry.'); }
+  }
+
+  Future<void> _selectDistrict(RwandaLocation? value) async {
+    setState(() {
+      _district = value?.name; _districtCode = value?.code;
+      _sector = null; _sectorCode = null; _sectors = [];
+      _cell = null; _cells = []; _locationError = null;
+    });
+    if (value == null) return;
+    try {
+      final items = await ref.read(rwandaLocationsRepositoryProvider).sectors(value.code);
+      if (mounted && _districtCode == value.code) setState(() => _sectors = items);
+    } catch (_) { if (mounted) setState(() => _locationError = 'Could not load sectors. Please retry.'); }
+  }
+
+  Future<void> _selectSector(RwandaLocation? value) async {
+    setState(() {
+      _sector = value?.name; _sectorCode = value?.code;
+      _cell = null; _cells = []; _locationError = null;
+    });
+    if (value == null) return;
+    try {
+      final items = await ref.read(rwandaLocationsRepositoryProvider).cells(value.code);
+      if (mounted && _sectorCode == value.code) setState(() => _cells = items);
+    } catch (_) { if (mounted) setState(() => _locationError = 'Could not load cells. Please retry.'); }
+  }
+
+  Future<void> _selectCell(RwandaLocation value) async {
+    setState(() => _cell = value.name);
+  }
+
+  Future<void> _reloadCurrentLevel() async {
+    if (_provinceCode == null) return _loadProvinces();
+    if (_districtCode == null) return _selectProvince(_provinces.firstWhere((e) => e.code == _provinceCode));
+    if (_sectorCode == null) return _selectDistrict(_districts.firstWhere((e) => e.code == _districtCode));
+    return _selectSector(_sectors.firstWhere((e) => e.code == _sectorCode));
+  }
+
+  Future<void> _chooseLocation({
+    required String label,
+    required List<RwandaLocation> items,
+    required String? selected,
+    required ValueChanged<RwandaLocation> onSelected,
+    bool searchable = false,
+  }) async {
+    final picked = await showModalBottomSheet<RwandaLocation>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _LocationPickerSheet(title: label, items: items, searchable: searchable),
+    );
+    if (picked != null) onSelected(picked);
+  }
+
+  Widget _locationField({
+    required String label,
+    required String? value,
+    required List<RwandaLocation> items,
+    required VoidCallback? onTap,
+    required String? Function(String?) validator,
+    required IconData icon,
+  }) => FormField<String>(
+    initialValue: value,
+    validator: validator,
+    builder: (field) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(label, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
+      const SizedBox(height: AppSpacing.xs),
+      InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        child: InputDecorator(
+          decoration: InputDecoration(
+            prefixIcon: Icon(icon, size: 20),
+            hintText: 'Select ${label.toLowerCase()}',
+            errorText: field.errorText,
+            suffixIcon: const Icon(Icons.arrow_drop_down_rounded),
+          ),
+          child: Text(value ?? '', style: TextStyle(color: value == null ? AppColors.textSecondary : AppColors.textPrimary)),
+        ),
+      ),
+    ]),
+  );
 
   @override
   void dispose() {
@@ -448,11 +561,19 @@ class _CreatePropertyScreenState extends ConsumerState<CreatePropertyScreen> {
   final _formKey = GlobalKey<FormState>();
   final _name = TextEditingController();
   final _owner = TextEditingController();
-  final _province = TextEditingController();
-  final _district = TextEditingController();
-  final _sector = TextEditingController();
-  final _cell = TextEditingController();
-  final _village = TextEditingController();
+  String? _province;
+  String? _provinceCode;
+  String? _district;
+  String? _districtCode;
+  String? _sector;
+  String? _sectorCode;
+  String? _cell;
+  List<RwandaLocation> _provinces = [];
+  List<RwandaLocation> _districts = [];
+  List<RwandaLocation> _sectors = [];
+  List<RwandaLocation> _cells = [];
+  bool _locationsLoading = true;
+  String? _locationError;
   final _upi = TextEditingController();
   PropertyType? _type;
   bool _busy = false;
@@ -463,11 +584,6 @@ class _CreatePropertyScreenState extends ConsumerState<CreatePropertyScreen> {
     for (final c in [
       _name,
       _owner,
-      _province,
-      _district,
-      _sector,
-      _cell,
-      _village,
       _upi
     ]) c.dispose();
     super.dispose();
@@ -487,11 +603,10 @@ class _CreatePropertyScreenState extends ConsumerState<CreatePropertyScreen> {
             name: _name.text,
             propertyType: _type!,
             ownerClientName: _owner.text,
-            province: _province.text,
-            district: _district.text,
-            sector: _sector.text,
-            cell: _cell.text,
-            villageStreet: _village.text,
+            province: _province!,
+            district: _district!,
+            sector: _sector!,
+            cell: _cell!,
             titleNumber: _upi.text,
           ));
       ref.read(propertyListProvider.notifier).prepend(property);
@@ -571,44 +686,22 @@ class _CreatePropertyScreenState extends ConsumerState<CreatePropertyScreen> {
                           'UPI is the only land identifier required. Please fill it in very carefully.'),
                   const SizedBox(height: AppSpacing.xl),
                   const SectionLabel('Location'),
-                  SciTextField(
-                      controller: _province,
-                      label: 'PROVINCE',
-                      hint: 'Kigali',
-                      icon: Icons.map_outlined,
-                      enabled: !_busy,
-                      validator: Validators.required('Province is required')),
-                  const SizedBox(height: AppSpacing.md),
-                  SciTextField(
-                      controller: _district,
-                      label: 'DISTRICT',
-                      hint: 'Gasabo',
-                      icon: Icons.location_city_outlined,
-                      enabled: !_busy,
-                      validator: Validators.required('District is required')),
-                  const SizedBox(height: AppSpacing.md),
-                  SciTextField(
-                      controller: _sector,
-                      label: 'SECTOR',
-                      hint: 'Kimironko',
-                      icon: Icons.grid_view_outlined,
-                      enabled: !_busy,
-                      validator: Validators.required('Sector is required')),
-                  const SizedBox(height: AppSpacing.md),
-                  SciTextField(
-                      controller: _cell,
-                      label: 'CELL',
-                      hint: 'Nyagatovu',
-                      icon: Icons.hexagon_outlined,
-                      enabled: !_busy,
-                      validator: Validators.required('Cell is required')),
-                  const SizedBox(height: AppSpacing.md),
-                  SciTextField(
-                      controller: _village,
-                      label: 'VILLAGE / STREET (OPTIONAL)',
-                      hint: 'KG 11 Ave',
-                      icon: Icons.signpost_outlined,
-                      enabled: !_busy),
+                  if (_locationsLoading)
+                    const Padding(padding: EdgeInsets.all(AppSpacing.md), child: Center(child: CircularProgressIndicator()))
+                  else ...[
+                    _locationField(label: 'PROVINCE', value: _province, items: _provinces, icon: Icons.map_outlined, onTap: _busy || _provinces.isEmpty ? null : () => _chooseLocation(label: 'Province', items: _provinces, selected: _province, onSelected: _selectProvince), validator: Validators.required('Province is required')),
+                    const SizedBox(height: AppSpacing.md),
+                    _locationField(label: 'DISTRICT', value: _district, items: _districts, icon: Icons.location_city_outlined, onTap: _busy || _provinceCode == null || _districts.isEmpty ? null : () => _chooseLocation(label: 'District', items: _districts, selected: _district, searchable: true, onSelected: _selectDistrict), validator: Validators.required('District is required')),
+                    const SizedBox(height: AppSpacing.md),
+                    _locationField(label: 'SECTOR', value: _sector, items: _sectors, icon: Icons.grid_view_outlined, onTap: _busy || _districtCode == null || _sectors.isEmpty ? null : () => _chooseLocation(label: 'Sector', items: _sectors, selected: _sector, searchable: true, onSelected: _selectSector), validator: Validators.required('Sector is required')),
+                    const SizedBox(height: AppSpacing.md),
+                    _locationField(label: 'CELL', value: _cell, items: _cells, icon: Icons.hexagon_outlined, onTap: _busy || _sectorCode == null || _cells.isEmpty ? null : () => _chooseLocation(label: 'Cell', items: _cells, selected: _cell, searchable: true, onSelected: _selectCell), validator: Validators.required('Cell is required')),
+                    if (_locationError != null) ...[
+                      const SizedBox(height: AppSpacing.xs),
+                      MessageBanner(message: _locationError!),
+                      TextButton.icon(onPressed: _provinceCode == null ? _loadProvinces : _reloadCurrentLevel, icon: const Icon(Icons.refresh), label: const Text('Retry location loading')),
+                    ],
+                  ],
                   const SizedBox(height: AppSpacing.md),
                   Container(
                       padding: const EdgeInsets.all(AppSpacing.md),
@@ -632,4 +725,44 @@ class _CreatePropertyScreenState extends ConsumerState<CreatePropertyScreen> {
                   const SizedBox(height: AppSpacing.xl),
                 ])),
       );
+}
+
+
+class _LocationPickerSheet extends StatefulWidget {
+  const _LocationPickerSheet({required this.title, required this.items, required this.searchable});
+  final String title;
+  final List<RwandaLocation> items;
+  final bool searchable;
+  @override
+  State<_LocationPickerSheet> createState() => _LocationPickerSheetState();
+}
+
+class _LocationPickerSheetState extends State<_LocationPickerSheet> {
+  String query = '';
+  @override
+  Widget build(BuildContext context) {
+    final filtered = widget.items.where((item) => item.name.toLowerCase().contains(query.trim().toLowerCase())).toList();
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(left: AppSpacing.md, right: AppSpacing.md, top: AppSpacing.md, bottom: MediaQuery.viewInsetsOf(context).bottom + AppSpacing.md),
+        child: SizedBox(
+          height: MediaQuery.sizeOf(context).height * .68,
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Select ${widget.title}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+            if (widget.searchable) ...[
+              const SizedBox(height: AppSpacing.md),
+              TextField(onChanged: (value) => setState(() => query = value), decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Search by name')),
+            ],
+            const SizedBox(height: AppSpacing.sm),
+            Expanded(child: filtered.isEmpty
+              ? const Center(child: Text('No matching locations found'))
+              : ListView.builder(itemCount: filtered.length, itemBuilder: (context, index) {
+                  final item = filtered[index];
+                  return ListTile(title: Text(item.name), onTap: () => Navigator.pop(context, item));
+                })),
+          ]),
+        ),
+      ),
+    );
+  }
 }
