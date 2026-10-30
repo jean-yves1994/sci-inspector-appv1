@@ -122,6 +122,7 @@ class _PropertyListScreenState extends ConsumerState<PropertyListScreen> {
     required String? Function(String?) validator,
     required IconData icon,
   }) => FormField<String>(
+    key: ValueKey<String?>(value),
     initialValue: value,
     validator: validator,
     builder: (field) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
