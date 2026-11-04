@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -7,7 +8,6 @@ import '../../../app/router/routes.dart';
 import '../../../core/network/api_error.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/validators.dart';
-import '../../../core/utils/upi_input_formatter.dart';
 import '../../../core/widgets/sci_widgets.dart';
 import '../../auth/application/session_controller.dart';
 import '../../auth/domain/user.dart';
@@ -16,6 +16,7 @@ import '../application/property_providers.dart';
 import '../data/properties_repository.dart';
 import '../data/rwanda_locations_repository.dart';
 import '../domain/property.dart';
+import '../../../core/utils/upi_input_formatter.dart';
 
 class PropertyListScreen extends ConsumerStatefulWidget {
   const PropertyListScreen({super.key});
@@ -51,7 +52,7 @@ class _PropertyListScreenState extends ConsumerState<PropertyListScreen> {
     final list = ref.watch(propertyListProvider);
     final term = ref.watch(propertySearchProvider);
     final canCreate =
-        ref.watch(hasPermissionProvider(Permissions.propertiesWrite));
+    ref.watch(hasPermissionProvider(Permissions.propertiesWrite));
     return Scaffold(
       appBar: AppBar(title: const Text('Properties'), actions: [
         if (canCreate)
@@ -73,60 +74,60 @@ class _PropertyListScreenState extends ConsumerState<PropertyListScreen> {
               suffixIcon: _search.text.isEmpty
                   ? null
                   : IconButton(
-                      icon: const Icon(Icons.close_rounded, size: 18),
-                      onPressed: () {
-                        _search.clear();
-                        ref.read(propertySearchProvider.notifier).clear();
-                        setState(() {});
-                      }),
+                  icon: const Icon(Icons.close_rounded, size: 18),
+                  onPressed: () {
+                    _search.clear();
+                    ref.read(propertySearchProvider.notifier).clear();
+                    setState(() {});
+                  }),
             ),
           ),
         ),
         Expanded(
             child: list.when(
-          loading: () => const ListSkeleton(),
-          error: (e, _) => ErrorStateView(
-              error: e, onRetry: () => ref.invalidate(propertyListProvider)),
-          data: (state) => RefreshIndicator(
-            onRefresh: ref.read(propertyListProvider.notifier).refresh,
-            child: state.items.isEmpty
-                ? ListView(children: [
-                    SizedBox(
-                        height: MediaQuery.sizeOf(context).height * .55,
-                        child: EmptyState(
-                            icon: Icons.apartment_outlined,
-                            title: term.isEmpty
-                                ? 'No properties yet'
-                                : 'No properties found',
-                            message: term.isEmpty
-                                ? 'Register a property to start an inspection.'
-                                : 'Try another search.',
-                            actionLabel: canCreate ? '+ New property' : null,
-                            onAction: canCreate
-                                ? () => context.push(Routes.propertyNew)
-                                : null))
-                  ])
-                : ListView.separated(
-                    controller: _scroll,
-                    padding: const EdgeInsets.fromLTRB(
-                        AppSpacing.md, AppSpacing.xs, AppSpacing.md, 120),
-                    itemCount: state.items.length + 1,
-                    separatorBuilder: (_, __) =>
-                        const SizedBox(height: AppSpacing.sm),
-                    itemBuilder: (context, i) {
-                      if (i == state.items.length)
-                        return state.isLoadingMore
-                            ? const Padding(
-                                padding: EdgeInsets.all(AppSpacing.lg),
-                                child: Center(
-                                    child: CircularProgressIndicator(
-                                        strokeWidth: 2)))
-                            : const SizedBox.shrink();
-                      return _PropertyCard(property: state.items[i]);
-                    },
-                  ),
-          ),
-        )),
+              loading: () => const ListSkeleton(),
+              error: (e, _) => ErrorStateView(
+                  error: e, onRetry: () => ref.invalidate(propertyListProvider)),
+              data: (state) => RefreshIndicator(
+                onRefresh: ref.read(propertyListProvider.notifier).refresh,
+                child: state.items.isEmpty
+                    ? ListView(children: [
+                  SizedBox(
+                      height: MediaQuery.sizeOf(context).height * .55,
+                      child: EmptyState(
+                          icon: Icons.apartment_outlined,
+                          title: term.isEmpty
+                              ? 'No properties yet'
+                              : 'No properties found',
+                          message: term.isEmpty
+                              ? 'Register a property to start an inspection.'
+                              : 'Try another search.',
+                          actionLabel: canCreate ? '+ New property' : null,
+                          onAction: canCreate
+                              ? () => context.push(Routes.propertyNew)
+                              : null))
+                ])
+                    : ListView.separated(
+                  controller: _scroll,
+                  padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.md, AppSpacing.xs, AppSpacing.md, 120),
+                  itemCount: state.items.length + 1,
+                  separatorBuilder: (_, __) =>
+                  const SizedBox(height: AppSpacing.sm),
+                  itemBuilder: (context, i) {
+                    if (i == state.items.length)
+                      return state.isLoadingMore
+                          ? const Padding(
+                          padding: EdgeInsets.all(AppSpacing.lg),
+                          child: Center(
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2)))
+                          : const SizedBox.shrink();
+                    return _PropertyCard(property: state.items[i]);
+                  },
+                ),
+              ),
+            )),
       ]),
     );
   }
@@ -137,7 +138,7 @@ class _PropertyCard extends StatelessWidget {
   final Property property;
   @override
   Widget build(BuildContext context) => Card(
-          child: InkWell(
+      child: InkWell(
         onTap: () => context.push(Routes.propertyDetail(property.id)),
         borderRadius: BorderRadius.circular(AppRadius.lg),
         child: Padding(
@@ -156,42 +157,42 @@ class _PropertyCard extends StatelessWidget {
                 child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                  Row(children: [
-                    Expanded(
-                        child: Text(
-                            property.reference.isEmpty
-                                ? 'Reference pending'
-                                : property.reference,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.primary))),
-                    if (property.propertyType != null)
-                      StatusBadge(
-                          label: property.propertyType!.label,
-                          color: AppColors.violet)
-                  ]),
-                  const SizedBox(height: 2),
-                  Text(property.name,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          fontSize: 15, fontWeight: FontWeight.w700)),
-                  _Meta(
-                      icon: Icons.person_outline_rounded,
-                      text: property.ownerClientName.isEmpty
-                          ? 'Owner not recorded'
-                          : property.ownerClientName),
-                  _Meta(
-                      icon: Icons.place_outlined,
-                      text: property.locationSummary),
-                  if (property.titleNumber?.trim().isNotEmpty ?? false)
-                    _Meta(
-                        icon: Icons.confirmation_number_outlined,
-                        text: 'UPI ${property.titleNumber!.trim()}'),
-                ])),
+                      Row(children: [
+                        Expanded(
+                            child: Text(
+                                property.reference.isEmpty
+                                    ? 'Reference pending'
+                                    : property.reference,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.primary))),
+                        if (property.propertyType != null)
+                          StatusBadge(
+                              label: property.propertyType!.label,
+                              color: AppColors.violet)
+                      ]),
+                      const SizedBox(height: 2),
+                      Text(property.name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 15, fontWeight: FontWeight.w700)),
+                      _Meta(
+                          icon: Icons.person_outline_rounded,
+                          text: property.ownerClientName.isEmpty
+                              ? 'Owner not recorded'
+                              : property.ownerClientName),
+                      _Meta(
+                          icon: Icons.place_outlined,
+                          text: property.locationSummary),
+                      if (property.titleNumber?.trim().isNotEmpty ?? false)
+                        _Meta(
+                            icon: Icons.confirmation_number_outlined,
+                            text: 'UPI ${property.titleNumber!.trim()}'),
+                    ])),
             const Icon(Icons.chevron_right_rounded,
                 size: 20, color: AppColors.textSecondary),
           ]),
@@ -225,7 +226,7 @@ class PropertyDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final detail = ref.watch(propertyDetailProvider(propertyId));
     final canCreate =
-        ref.watch(hasPermissionProvider(Permissions.inspectionsCreate));
+    ref.watch(hasPermissionProvider(Permissions.inspectionsCreate));
     return Scaffold(
       appBar: AppBar(title: const Text('Property')),
       body: detail.when(
@@ -260,18 +261,18 @@ class PropertyDetailScreen extends ConsumerWidget {
                                   Expanded(
                                       child: Column(
                                           crossAxisAlignment:
-                                              CrossAxisAlignment.start,
+                                          CrossAxisAlignment.start,
                                           children: [
-                                        Text(p.reference,
-                                            style: const TextStyle(
-                                                fontSize: 12.5,
-                                                fontWeight: FontWeight.w700,
-                                                color: AppColors.primary)),
-                                        Text(p.name,
-                                            style: const TextStyle(
-                                                fontSize: 19,
-                                                fontWeight: FontWeight.w800))
-                                      ]))
+                                            Text(p.reference,
+                                                style: const TextStyle(
+                                                    fontSize: 12.5,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: AppColors.primary)),
+                                            Text(p.name,
+                                                style: const TextStyle(
+                                                    fontSize: 19,
+                                                    fontWeight: FontWeight.w800))
+                                          ]))
                                 ]),
                                 const SizedBox(height: AppSpacing.sm),
                                 Wrap(spacing: AppSpacing.xs, children: [
@@ -368,7 +369,7 @@ class PropertyDetailScreen extends ConsumerWidget {
                             child: Text(
                                 'No inspections recorded for this property yet.',
                                 style:
-                                    TextStyle(color: AppColors.textSecondary))))
+                                TextStyle(color: AppColors.textSecondary))))
                   else
                     for (final i in p.recentInspections)
                       Padding(
@@ -389,7 +390,7 @@ class PropertyDetailScreen extends ConsumerWidget {
                                   context.push(Routes.inspectionDetail(i.id)),
                               trailing: StatusBadge(
                                   label:
-                                      InspectionStatusX.parse(i.status).label,
+                                  InspectionStatusX.parse(i.status).label,
                                   color: InspectionStatusX.parse(i.status)
                                       .color))),
                   const SizedBox(height: AppSpacing.xxxl),
@@ -397,13 +398,13 @@ class PropertyDetailScreen extends ConsumerWidget {
       ),
       bottomNavigationBar: detail.hasValue && canCreate
           ? SafeArea(
-              child: Padding(
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  child: FilledButton.icon(
-                      onPressed: () =>
-                          context.push(Routes.inspectionNewFor(propertyId)),
-                      icon: const Icon(Icons.assignment_add, size: 20),
-                      label: const Text('Create inspection'))))
+          child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: FilledButton.icon(
+                  onPressed: () =>
+                      context.push(Routes.inspectionNewFor(propertyId)),
+                  icon: const Icon(Icons.assignment_add, size: 20),
+                  label: const Text('Create inspection'))))
           : null,
     );
   }
@@ -580,41 +581,43 @@ class _CreatePropertyScreenState extends ConsumerState<CreatePropertyScreen> {
       ),
     ]),
   );
-
   @override
   void dispose() {
-    for (final c in [
-      _name,
-      _owner,
-      _upi
-    ]) c.dispose();
+    _name.dispose();
+    _owner.dispose();
+    _upi.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
     FocusScope.of(context).unfocus();
     if (!(_formKey.currentState?.validate() ?? false)) return;
+
     setState(() {
       _busy = true;
       _error = null;
     });
+
     try {
       final property = await ref
           .read(propertiesRepositoryProvider)
           .create(CreatePropertyRequest(
-            name: _name.text,
-            propertyType: _type!,
-            ownerClientName: _owner.text,
-            province: _province!,
-            district: _district!,
-            sector: _sector!,
-            cell: _cell!,
-            titleNumber: _upi.text.trim().replaceAll(RegExp(r'/+
-          ));
+        name: _name.text.trim(),
+        propertyType: _type!,
+        ownerClientName: _owner.text.trim(),
+        province: _province!,
+        district: _district!,
+        sector: _sector!,
+        cell: _cell!,
+        titleNumber: _upi.text.trim().replaceAll(RegExp(r'/+$'), ''),
+      ));
+
       ref.read(propertyListProvider.notifier).prepend(property);
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Property ${property.reference} created.')));
+        SnackBar(content: Text('Property ${property.reference} created.')),
+      );
       context.pushReplacement(Routes.propertyDetail(property.id));
     } on ApiError catch (e) {
       if (mounted) setState(() => _error = e.message);
@@ -625,559 +628,324 @@ class _CreatePropertyScreenState extends ConsumerState<CreatePropertyScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('New property')),
-        body: Form(
-            key: _formKey,
-            child: ListView(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                children: [
-                  const SectionLabel('Identification'),
-                  SciTextField(
-                      controller: _name,
-                      label: 'PROPERTY NAME / DESCRIPTION',
-                      hint: 'Kigali Commercial Building',
-                      icon: Icons.apartment_rounded,
-                      enabled: !_busy,
-                      validator:
-                          Validators.required('Property name is required')),
-                  const SizedBox(height: AppSpacing.md),
-                  Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('PROPERTY TYPE',
-                            style: TextStyle(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.textSecondary)),
-                        const SizedBox(height: AppSpacing.xs),
-                        DropdownButtonFormField<PropertyType>(
-                            initialValue: _type,
-                            isExpanded: true,
-                            decoration: const InputDecoration(
-                                prefixIcon:
-                                    Icon(Icons.category_outlined, size: 20),
-                                hintText: 'Select property type'),
-                            items: [
-                              for (final t in PropertyType.values)
-                                DropdownMenuItem(value: t, child: Text(t.label))
-                            ],
-                            onChanged:
-                                _busy ? null : (v) => setState(() => _type = v),
-                            validator: (v) =>
-                                v == null ? 'Property type is required' : null)
-                      ]),
-                  const SizedBox(height: AppSpacing.md),
-                  SciTextField(
-                      controller: _owner,
-                      label: 'OWNER / CLIENT NAME',
-                      hint: 'John Doe',
-                      icon: Icons.person_outline_rounded,
-                      enabled: !_busy,
-                      validator: Validators.required(
-                          'Owner / client name is required')),
-                  const SizedBox(height: AppSpacing.xl),
-                  const SectionLabel('Land information'),
-                  SciTextField(
-                      controller: _upi,
-                      label: 'UPI',
-                      hint: '1/02/09/04/1234',
-                      icon: Icons.confirmation_number_outlined,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: <TextInputFormatter>[
-                        UpiInputFormatter(),
-                      ],
-                      enabled: !_busy,
-                      validator: (value) {
-                        final upi = value?.trim() ?? '';
-                        if (upi.isEmpty) return 'UPI is required';
-                        if (!RegExp(r'^\\d/\\d{2}/\\d{2}/\\d{2}/\\d{4}
-                  const SizedBox(height: AppSpacing.xl),
-                  const SectionLabel('Location'),
-                  if (_locationsLoading)
-                    const Padding(padding: EdgeInsets.all(AppSpacing.md), child: Center(child: CircularProgressIndicator()))
-                  else ...[
-                    _locationField(label: 'PROVINCE', value: _province, items: _provinces, icon: Icons.map_outlined, onTap: _busy || _provinces.isEmpty ? null : () => _chooseLocation(label: 'Province', items: _provinces, selected: _province, onSelected: _selectProvince), validator: Validators.required('Province is required')),
-                    const SizedBox(height: AppSpacing.md),
-                    _locationField(label: 'DISTRICT', value: _district, items: _districts, icon: Icons.location_city_outlined, onTap: _busy || _provinceCode == null || _districts.isEmpty ? null : () => _chooseLocation(label: 'District', items: _districts, selected: _district, searchable: true, onSelected: _selectDistrict), validator: Validators.required('District is required')),
-                    const SizedBox(height: AppSpacing.md),
-                    _locationField(label: 'SECTOR', value: _sector, items: _sectors, icon: Icons.grid_view_outlined, onTap: _busy || _districtCode == null || _sectors.isEmpty ? null : () => _chooseLocation(label: 'Sector', items: _sectors, selected: _sector, searchable: true, onSelected: _selectSector), validator: Validators.required('Sector is required')),
-                    const SizedBox(height: AppSpacing.md),
-                    _locationField(label: 'CELL', value: _cell, items: _cells, icon: Icons.hexagon_outlined, onTap: _busy || _sectorCode == null || _cells.isEmpty ? null : () => _chooseLocation(label: 'Cell', items: _cells, selected: _cell, searchable: true, onSelected: _selectCell), validator: Validators.required('Cell is required')),
-                    if (_locationError != null) ...[
-                      const SizedBox(height: AppSpacing.xs),
-                      MessageBanner(message: _locationError!),
-                      TextButton.icon(onPressed: _provinceCode == null ? _loadProvinces : _reloadCurrentLevel, icon: const Icon(Icons.refresh), label: const Text('Retry location loading')),
-                    ],
-                  ],
-                  const SizedBox(height: AppSpacing.md),
-                  Container(
-                      padding: const EdgeInsets.all(AppSpacing.md),
-                      decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: .06),
-                          borderRadius: BorderRadius.circular(AppRadius.md)),
-                      child: const Text(
-                          'Property reference is generated automatically by the server from the owner name and creation date. It is not entered or edited here.',
-                          style: TextStyle(
-                              fontSize: 12.5, color: AppColors.textSecondary))),
-                  if (_error != null) ...[
-                    const SizedBox(height: AppSpacing.md),
-                    MessageBanner(message: _error!)
-                  ],
-                  const SizedBox(height: AppSpacing.xl),
-                  FilledButton(
-                      onPressed: _busy ? null : _submit,
-                      child: _busy
-                          ? const ButtonSpinner()
-                          : const Text('Create property')),
-                  const SizedBox(height: AppSpacing.xl),
-                ])),
-      );
+    appBar: AppBar(title: const Text('New property')),
+    body: Form(
+      key: _formKey,
+      child: ListView(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        children: [
+          const SectionLabel('Identification'),
+          SciTextField(
+            controller: _name,
+            label: 'PROPERTY NAME / DESCRIPTION',
+            hint: 'Kigali Commercial Building',
+            icon: Icons.apartment_rounded,
+            enabled: !_busy,
+            validator: Validators.required('Property name is required'),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'PROPERTY TYPE',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              DropdownButtonFormField<PropertyType>(
+                initialValue: _type,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  prefixIcon: Icon(Icons.category_outlined, size: 20),
+                  hintText: 'Select property type',
+                ),
+                items: [
+                  for (final type in PropertyType.values)
+                    DropdownMenuItem(value: type, child: Text(type.label)),
+                ],
+                onChanged: _busy
+                    ? null
+                    : (value) => setState(() => _type = value),
+                validator: (value) =>
+                value == null ? 'Property type is required' : null,
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          SciTextField(
+            controller: _owner,
+            label: 'OWNER / CLIENT NAME',
+            hint: 'John Doe',
+            icon: Icons.person_outline_rounded,
+            enabled: !_busy,
+            validator:
+            Validators.required('Owner / client name is required'),
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          const SectionLabel('Land information'),
+          SciTextField(
+            controller: _upi,
+            label: 'UPI',
+            hint: '1/02/09/04/1234..',
+            icon: Icons.confirmation_number_outlined,
+            keyboardType: TextInputType.number,
+            inputFormatters: <TextInputFormatter>[
+              UpiInputFormatter(),
+            ],
+            enabled: !_busy,
+            validator: (value) {
+              final upi = value?.trim() ?? '';
+
+              if (upi.isEmpty) {
+                return 'UPI is required';
+              }
+
+              if (!RegExp(r'^\d/\d{2}/\d{2}/\d{2}/\d{9}$')
+                  .hasMatch(upi)) {
+                return 'Enter a complete UPI, e.g. 1/02/09/04/123456789';
+              }
+
+              return null;
+            },
+            helper:
+            'Slashes are added automatically as you type. Please verify the UPI carefully.',
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          const SectionLabel('Location'),
+          if (_locationsLoading)
+            const Padding(
+              padding: EdgeInsets.all(AppSpacing.md),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else ...[
+            _locationField(
+              label: 'PROVINCE',
+              value: _province,
+              items: _provinces,
+              icon: Icons.map_outlined,
+              onTap: _busy || _provinces.isEmpty
+                  ? null
+                  : () => _chooseLocation(
+                label: 'Province',
+                items: _provinces,
+                selected: _province,
+                onSelected: _selectProvince,
+              ),
+              validator: Validators.required('Province is required'),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            _locationField(
+              label: 'DISTRICT',
+              value: _district,
+              items: _districts,
+              icon: Icons.location_city_outlined,
+              onTap: _busy || _provinceCode == null || _districts.isEmpty
+                  ? null
+                  : () => _chooseLocation(
+                label: 'District',
+                items: _districts,
+                selected: _district,
+                searchable: true,
+                onSelected: _selectDistrict,
+              ),
+              validator: Validators.required('District is required'),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            _locationField(
+              label: 'SECTOR',
+              value: _sector,
+              items: _sectors,
+              icon: Icons.grid_view_outlined,
+              onTap: _busy || _districtCode == null || _sectors.isEmpty
+                  ? null
+                  : () => _chooseLocation(
+                label: 'Sector',
+                items: _sectors,
+                selected: _sector,
+                searchable: true,
+                onSelected: _selectSector,
+              ),
+              validator: Validators.required('Sector is required'),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            _locationField(
+              label: 'CELL',
+              value: _cell,
+              items: _cells,
+              icon: Icons.hexagon_outlined,
+              onTap: _busy || _sectorCode == null || _cells.isEmpty
+                  ? null
+                  : () => _chooseLocation(
+                label: 'Cell',
+                items: _cells,
+                selected: _cell,
+                searchable: true,
+                onSelected: _selectCell,
+              ),
+              validator: Validators.required('Cell is required'),
+            ),
+            if (_locationError != null) ...[
+              const SizedBox(height: AppSpacing.xs),
+              MessageBanner(message: _locationError!),
+              TextButton.icon(
+                onPressed: _provinceCode == null
+                    ? _loadProvinces
+                    : _reloadCurrentLevel,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Retry location loading'),
+              ),
+            ],
+          ],
+          const SizedBox(height: AppSpacing.md),
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: .06),
+              borderRadius: BorderRadius.circular(AppRadius.md),
+            ),
+            child: const Text(
+              'Property reference is generated automatically by the server from the owner name and creation date. It is not entered or edited here.',
+              style: TextStyle(
+                fontSize: 12.5,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: AppSpacing.md),
+            MessageBanner(message: _error!),
+          ],
+          const SizedBox(height: AppSpacing.xl),
+          FilledButton(
+            onPressed: _busy ? null : _submit,
+            child: _busy
+                ? const ButtonSpinner()
+                : const Text('Create property'),
+          ),
+          const SizedBox(height: AppSpacing.xl),
+        ],
+      ),
+    ),
+  );
 }
 
-
 class _LocationPickerSheet extends StatefulWidget {
-  const _LocationPickerSheet({required this.title, required this.items, required this.searchable});
+  const _LocationPickerSheet({
+    required this.title,
+    required this.items,
+    required this.searchable,
+  });
+
   final String title;
   final List<RwandaLocation> items;
   final bool searchable;
+
   @override
   State<_LocationPickerSheet> createState() => _LocationPickerSheetState();
 }
 
 class _LocationPickerSheetState extends State<_LocationPickerSheet> {
   String query = '';
+
   @override
   Widget build(BuildContext context) {
-    final filtered = widget.items.where((item) => item.name.toLowerCase().contains(query.trim().toLowerCase())).toList();
+    final normalizedQuery = query.trim().toLowerCase();
+    final filtered = widget.items
+        .where((item) => item.name.toLowerCase().contains(normalizedQuery))
+        .toList();
+
     return SafeArea(
       child: Padding(
-        padding: EdgeInsets.only(left: AppSpacing.md, right: AppSpacing.md, top: AppSpacing.md, bottom: MediaQuery.viewInsetsOf(context).bottom + AppSpacing.md),
+        padding: EdgeInsets.only(
+          left: AppSpacing.md,
+          right: AppSpacing.md,
+          top: AppSpacing.md,
+          bottom:
+          MediaQuery.viewInsetsOf(context).bottom + AppSpacing.md,
+        ),
         child: SizedBox(
           height: MediaQuery.sizeOf(context).height * .68,
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Select ${widget.title}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-            if (widget.searchable) ...[
-              const SizedBox(height: AppSpacing.md),
-              TextField(onChanged: (value) => setState(() => query = value), decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Search by name')),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Select ${widget.title}',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              if (widget.searchable) ...[
+                const SizedBox(height: AppSpacing.md),
+                TextField(
+                  onChanged: (value) => setState(() => query = value),
+                  decoration: const InputDecoration(
+                    prefixIcon: Icon(Icons.search),
+                    hintText: 'Search by name',
+                  ),
+                ),
+              ],
+              const SizedBox(height: AppSpacing.sm),
+              Expanded(
+                child: filtered.isEmpty
+                    ? const Center(
+                  child: Text('No matching locations found'),
+                )
+                    : ListView.builder(
+                  itemCount: filtered.length,
+                  itemBuilder: (context, index) {
+                    final item = filtered[index];
+                    return ListTile(
+                      title: Text(item.name),
+                      onTap: () => Navigator.pop(context, item),
+                    );
+                  },
+                ),
+              ),
             ],
-            const SizedBox(height: AppSpacing.sm),
-            Expanded(child: filtered.isEmpty
-              ? const Center(child: Text('No matching locations found'))
-              : ListView.builder(itemCount: filtered.length, itemBuilder: (context, index) {
-                  final item = filtered[index];
-                  return ListTile(title: Text(item.name), onTap: () => Navigator.pop(context, item));
-                })),
-          ]),
+          ),
         ),
       ),
     );
   }
 }
-), ''),
-          ));
-      ref.read(propertyListProvider.notifier).prepend(property);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Property ${property.reference} created.')));
-      context.pushReplacement(Routes.propertyDetail(property.id));
-    } on ApiError catch (e) {
-      if (mounted) setState(() => _error = e.message);
-    } finally {
-      if (mounted) setState(() => _busy = false);
+
+
+/// Formats a Rwanda UPI as 1/02/09/04/1234 while the user types.
+/// Existing separators are removed before rebuilding the formatted value.
+class _UpiInputFormatter extends TextInputFormatter {
+  static const List<int> _segmentLengths = [1, 2, 2, 2, 9];
+
+  @override
+  TextEditingValue formatEditUpdate(
+      TextEditingValue oldValue,
+      TextEditingValue newValue,
+      ) {
+    final digits = newValue.text.replaceAll(RegExp(r'[^0-16]'), '');
+    final limitedDigits =
+    digits.length > 16 ? digits.substring(0, 16) : digits;
+
+    final result = StringBuffer();
+    var offset = 0;
+
+    for (final segmentLength in _segmentLengths) {
+      if (offset >= limitedDigits.length) break;
+
+      if (result.isNotEmpty) result.write('/');
+      final end = (offset + segmentLength).clamp(0, limitedDigits.length);
+      result.write(limitedDigits.substring(offset, end));
+      offset = end;
     }
-  }
 
-  @override
-  Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('New property')),
-        body: Form(
-            key: _formKey,
-            child: ListView(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                children: [
-                  const SectionLabel('Identification'),
-                  SciTextField(
-                      controller: _name,
-                      label: 'PROPERTY NAME / DESCRIPTION',
-                      hint: 'Kigali Commercial Building',
-                      icon: Icons.apartment_rounded,
-                      enabled: !_busy,
-                      validator:
-                          Validators.required('Property name is required')),
-                  const SizedBox(height: AppSpacing.md),
-                  Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('PROPERTY TYPE',
-                            style: TextStyle(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.textSecondary)),
-                        const SizedBox(height: AppSpacing.xs),
-                        DropdownButtonFormField<PropertyType>(
-                            initialValue: _type,
-                            isExpanded: true,
-                            decoration: const InputDecoration(
-                                prefixIcon:
-                                    Icon(Icons.category_outlined, size: 20),
-                                hintText: 'Select property type'),
-                            items: [
-                              for (final t in PropertyType.values)
-                                DropdownMenuItem(value: t, child: Text(t.label))
-                            ],
-                            onChanged:
-                                _busy ? null : (v) => setState(() => _type = v),
-                            validator: (v) =>
-                                v == null ? 'Property type is required' : null)
-                      ]),
-                  const SizedBox(height: AppSpacing.md),
-                  SciTextField(
-                      controller: _owner,
-                      label: 'OWNER / CLIENT NAME',
-                      hint: 'John Doe',
-                      icon: Icons.person_outline_rounded,
-                      enabled: !_busy,
-                      validator: Validators.required(
-                          'Owner / client name is required')),
-                  const SizedBox(height: AppSpacing.xl),
-                  const SectionLabel('Land information'),
-                  SciTextField(
-                      controller: _upi,
-                      label: 'UPI',
-                      hint: 'Enter Unique Parcel Identifier',
-                      icon: Icons.confirmation_number_outlined,
-                      enabled: !_busy,
-                      validator: Validators.required('UPI is required'),
-                      helper:
-                          'UPI is the only land identifier required. Please fill it in very carefully.'),
-                  const SizedBox(height: AppSpacing.xl),
-                  const SectionLabel('Location'),
-                  if (_locationsLoading)
-                    const Padding(padding: EdgeInsets.all(AppSpacing.md), child: Center(child: CircularProgressIndicator()))
-                  else ...[
-                    _locationField(label: 'PROVINCE', value: _province, items: _provinces, icon: Icons.map_outlined, onTap: _busy || _provinces.isEmpty ? null : () => _chooseLocation(label: 'Province', items: _provinces, selected: _province, onSelected: _selectProvince), validator: Validators.required('Province is required')),
-                    const SizedBox(height: AppSpacing.md),
-                    _locationField(label: 'DISTRICT', value: _district, items: _districts, icon: Icons.location_city_outlined, onTap: _busy || _provinceCode == null || _districts.isEmpty ? null : () => _chooseLocation(label: 'District', items: _districts, selected: _district, searchable: true, onSelected: _selectDistrict), validator: Validators.required('District is required')),
-                    const SizedBox(height: AppSpacing.md),
-                    _locationField(label: 'SECTOR', value: _sector, items: _sectors, icon: Icons.grid_view_outlined, onTap: _busy || _districtCode == null || _sectors.isEmpty ? null : () => _chooseLocation(label: 'Sector', items: _sectors, selected: _sector, searchable: true, onSelected: _selectSector), validator: Validators.required('Sector is required')),
-                    const SizedBox(height: AppSpacing.md),
-                    _locationField(label: 'CELL', value: _cell, items: _cells, icon: Icons.hexagon_outlined, onTap: _busy || _sectorCode == null || _cells.isEmpty ? null : () => _chooseLocation(label: 'Cell', items: _cells, selected: _cell, searchable: true, onSelected: _selectCell), validator: Validators.required('Cell is required')),
-                    if (_locationError != null) ...[
-                      const SizedBox(height: AppSpacing.xs),
-                      MessageBanner(message: _locationError!),
-                      TextButton.icon(onPressed: _provinceCode == null ? _loadProvinces : _reloadCurrentLevel, icon: const Icon(Icons.refresh), label: const Text('Retry location loading')),
-                    ],
-                  ],
-                  const SizedBox(height: AppSpacing.md),
-                  Container(
-                      padding: const EdgeInsets.all(AppSpacing.md),
-                      decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: .06),
-                          borderRadius: BorderRadius.circular(AppRadius.md)),
-                      child: const Text(
-                          'Property reference is generated automatically by the server from the owner name and creation date. It is not entered or edited here.',
-                          style: TextStyle(
-                              fontSize: 12.5, color: AppColors.textSecondary))),
-                  if (_error != null) ...[
-                    const SizedBox(height: AppSpacing.md),
-                    MessageBanner(message: _error!)
-                  ],
-                  const SizedBox(height: AppSpacing.xl),
-                  FilledButton(
-                      onPressed: _busy ? null : _submit,
-                      child: _busy
-                          ? const ButtonSpinner()
-                          : const Text('Create property')),
-                  const SizedBox(height: AppSpacing.xl),
-                ])),
-      );
-}
-
-
-class _LocationPickerSheet extends StatefulWidget {
-  const _LocationPickerSheet({required this.title, required this.items, required this.searchable});
-  final String title;
-  final List<RwandaLocation> items;
-  final bool searchable;
-  @override
-  State<_LocationPickerSheet> createState() => _LocationPickerSheetState();
-}
-
-class _LocationPickerSheetState extends State<_LocationPickerSheet> {
-  String query = '';
-  @override
-  Widget build(BuildContext context) {
-    final filtered = widget.items.where((item) => item.name.toLowerCase().contains(query.trim().toLowerCase())).toList();
-    return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.only(left: AppSpacing.md, right: AppSpacing.md, top: AppSpacing.md, bottom: MediaQuery.viewInsetsOf(context).bottom + AppSpacing.md),
-        child: SizedBox(
-          height: MediaQuery.sizeOf(context).height * .68,
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Select ${widget.title}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-            if (widget.searchable) ...[
-              const SizedBox(height: AppSpacing.md),
-              TextField(onChanged: (value) => setState(() => query = value), decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Search by name')),
-            ],
-            const SizedBox(height: AppSpacing.sm),
-            Expanded(child: filtered.isEmpty
-              ? const Center(child: Text('No matching locations found'))
-              : ListView.builder(itemCount: filtered.length, itemBuilder: (context, index) {
-                  final item = filtered[index];
-                  return ListTile(title: Text(item.name), onTap: () => Navigator.pop(context, item));
-                })),
-          ]),
-        ),
-      ),
-    );
-  }
-}
-)
-                            .hasMatch(upi)) {
-                          return 'Enter a complete UPI, e.g. 1/02/09/04/1234';
-                        }
-                        return null;
-                      },
-                      helper:
-                          'Slashes are added automatically as you type. Please verify the UPI carefully.'),
-                  const SizedBox(height: AppSpacing.xl),
-                  const SectionLabel('Location'),
-                  if (_locationsLoading)
-                    const Padding(padding: EdgeInsets.all(AppSpacing.md), child: Center(child: CircularProgressIndicator()))
-                  else ...[
-                    _locationField(label: 'PROVINCE', value: _province, items: _provinces, icon: Icons.map_outlined, onTap: _busy || _provinces.isEmpty ? null : () => _chooseLocation(label: 'Province', items: _provinces, selected: _province, onSelected: _selectProvince), validator: Validators.required('Province is required')),
-                    const SizedBox(height: AppSpacing.md),
-                    _locationField(label: 'DISTRICT', value: _district, items: _districts, icon: Icons.location_city_outlined, onTap: _busy || _provinceCode == null || _districts.isEmpty ? null : () => _chooseLocation(label: 'District', items: _districts, selected: _district, searchable: true, onSelected: _selectDistrict), validator: Validators.required('District is required')),
-                    const SizedBox(height: AppSpacing.md),
-                    _locationField(label: 'SECTOR', value: _sector, items: _sectors, icon: Icons.grid_view_outlined, onTap: _busy || _districtCode == null || _sectors.isEmpty ? null : () => _chooseLocation(label: 'Sector', items: _sectors, selected: _sector, searchable: true, onSelected: _selectSector), validator: Validators.required('Sector is required')),
-                    const SizedBox(height: AppSpacing.md),
-                    _locationField(label: 'CELL', value: _cell, items: _cells, icon: Icons.hexagon_outlined, onTap: _busy || _sectorCode == null || _cells.isEmpty ? null : () => _chooseLocation(label: 'Cell', items: _cells, selected: _cell, searchable: true, onSelected: _selectCell), validator: Validators.required('Cell is required')),
-                    if (_locationError != null) ...[
-                      const SizedBox(height: AppSpacing.xs),
-                      MessageBanner(message: _locationError!),
-                      TextButton.icon(onPressed: _provinceCode == null ? _loadProvinces : _reloadCurrentLevel, icon: const Icon(Icons.refresh), label: const Text('Retry location loading')),
-                    ],
-                  ],
-                  const SizedBox(height: AppSpacing.md),
-                  Container(
-                      padding: const EdgeInsets.all(AppSpacing.md),
-                      decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: .06),
-                          borderRadius: BorderRadius.circular(AppRadius.md)),
-                      child: const Text(
-                          'Property reference is generated automatically by the server from the owner name and creation date. It is not entered or edited here.',
-                          style: TextStyle(
-                              fontSize: 12.5, color: AppColors.textSecondary))),
-                  if (_error != null) ...[
-                    const SizedBox(height: AppSpacing.md),
-                    MessageBanner(message: _error!)
-                  ],
-                  const SizedBox(height: AppSpacing.xl),
-                  FilledButton(
-                      onPressed: _busy ? null : _submit,
-                      child: _busy
-                          ? const ButtonSpinner()
-                          : const Text('Create property')),
-                  const SizedBox(height: AppSpacing.xl),
-                ])),
-      );
-}
-
-
-class _LocationPickerSheet extends StatefulWidget {
-  const _LocationPickerSheet({required this.title, required this.items, required this.searchable});
-  final String title;
-  final List<RwandaLocation> items;
-  final bool searchable;
-  @override
-  State<_LocationPickerSheet> createState() => _LocationPickerSheetState();
-}
-
-class _LocationPickerSheetState extends State<_LocationPickerSheet> {
-  String query = '';
-  @override
-  Widget build(BuildContext context) {
-    final filtered = widget.items.where((item) => item.name.toLowerCase().contains(query.trim().toLowerCase())).toList();
-    return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.only(left: AppSpacing.md, right: AppSpacing.md, top: AppSpacing.md, bottom: MediaQuery.viewInsetsOf(context).bottom + AppSpacing.md),
-        child: SizedBox(
-          height: MediaQuery.sizeOf(context).height * .68,
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Select ${widget.title}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-            if (widget.searchable) ...[
-              const SizedBox(height: AppSpacing.md),
-              TextField(onChanged: (value) => setState(() => query = value), decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Search by name')),
-            ],
-            const SizedBox(height: AppSpacing.sm),
-            Expanded(child: filtered.isEmpty
-              ? const Center(child: Text('No matching locations found'))
-              : ListView.builder(itemCount: filtered.length, itemBuilder: (context, index) {
-                  final item = filtered[index];
-                  return ListTile(title: Text(item.name), onTap: () => Navigator.pop(context, item));
-                })),
-          ]),
-        ),
-      ),
-    );
-  }
-}
-), ''),
-          ));
-      ref.read(propertyListProvider.notifier).prepend(property);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Property ${property.reference} created.')));
-      context.pushReplacement(Routes.propertyDetail(property.id));
-    } on ApiError catch (e) {
-      if (mounted) setState(() => _error = e.message);
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('New property')),
-        body: Form(
-            key: _formKey,
-            child: ListView(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                children: [
-                  const SectionLabel('Identification'),
-                  SciTextField(
-                      controller: _name,
-                      label: 'PROPERTY NAME / DESCRIPTION',
-                      hint: 'Kigali Commercial Building',
-                      icon: Icons.apartment_rounded,
-                      enabled: !_busy,
-                      validator:
-                          Validators.required('Property name is required')),
-                  const SizedBox(height: AppSpacing.md),
-                  Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('PROPERTY TYPE',
-                            style: TextStyle(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.textSecondary)),
-                        const SizedBox(height: AppSpacing.xs),
-                        DropdownButtonFormField<PropertyType>(
-                            initialValue: _type,
-                            isExpanded: true,
-                            decoration: const InputDecoration(
-                                prefixIcon:
-                                    Icon(Icons.category_outlined, size: 20),
-                                hintText: 'Select property type'),
-                            items: [
-                              for (final t in PropertyType.values)
-                                DropdownMenuItem(value: t, child: Text(t.label))
-                            ],
-                            onChanged:
-                                _busy ? null : (v) => setState(() => _type = v),
-                            validator: (v) =>
-                                v == null ? 'Property type is required' : null)
-                      ]),
-                  const SizedBox(height: AppSpacing.md),
-                  SciTextField(
-                      controller: _owner,
-                      label: 'OWNER / CLIENT NAME',
-                      hint: 'John Doe',
-                      icon: Icons.person_outline_rounded,
-                      enabled: !_busy,
-                      validator: Validators.required(
-                          'Owner / client name is required')),
-                  const SizedBox(height: AppSpacing.xl),
-                  const SectionLabel('Land information'),
-                  SciTextField(
-                      controller: _upi,
-                      label: 'UPI',
-                      hint: 'Enter Unique Parcel Identifier',
-                      icon: Icons.confirmation_number_outlined,
-                      enabled: !_busy,
-                      validator: Validators.required('UPI is required'),
-                      helper:
-                          'UPI is the only land identifier required. Please fill it in very carefully.'),
-                  const SizedBox(height: AppSpacing.xl),
-                  const SectionLabel('Location'),
-                  if (_locationsLoading)
-                    const Padding(padding: EdgeInsets.all(AppSpacing.md), child: Center(child: CircularProgressIndicator()))
-                  else ...[
-                    _locationField(label: 'PROVINCE', value: _province, items: _provinces, icon: Icons.map_outlined, onTap: _busy || _provinces.isEmpty ? null : () => _chooseLocation(label: 'Province', items: _provinces, selected: _province, onSelected: _selectProvince), validator: Validators.required('Province is required')),
-                    const SizedBox(height: AppSpacing.md),
-                    _locationField(label: 'DISTRICT', value: _district, items: _districts, icon: Icons.location_city_outlined, onTap: _busy || _provinceCode == null || _districts.isEmpty ? null : () => _chooseLocation(label: 'District', items: _districts, selected: _district, searchable: true, onSelected: _selectDistrict), validator: Validators.required('District is required')),
-                    const SizedBox(height: AppSpacing.md),
-                    _locationField(label: 'SECTOR', value: _sector, items: _sectors, icon: Icons.grid_view_outlined, onTap: _busy || _districtCode == null || _sectors.isEmpty ? null : () => _chooseLocation(label: 'Sector', items: _sectors, selected: _sector, searchable: true, onSelected: _selectSector), validator: Validators.required('Sector is required')),
-                    const SizedBox(height: AppSpacing.md),
-                    _locationField(label: 'CELL', value: _cell, items: _cells, icon: Icons.hexagon_outlined, onTap: _busy || _sectorCode == null || _cells.isEmpty ? null : () => _chooseLocation(label: 'Cell', items: _cells, selected: _cell, searchable: true, onSelected: _selectCell), validator: Validators.required('Cell is required')),
-                    if (_locationError != null) ...[
-                      const SizedBox(height: AppSpacing.xs),
-                      MessageBanner(message: _locationError!),
-                      TextButton.icon(onPressed: _provinceCode == null ? _loadProvinces : _reloadCurrentLevel, icon: const Icon(Icons.refresh), label: const Text('Retry location loading')),
-                    ],
-                  ],
-                  const SizedBox(height: AppSpacing.md),
-                  Container(
-                      padding: const EdgeInsets.all(AppSpacing.md),
-                      decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: .06),
-                          borderRadius: BorderRadius.circular(AppRadius.md)),
-                      child: const Text(
-                          'Property reference is generated automatically by the server from the owner name and creation date. It is not entered or edited here.',
-                          style: TextStyle(
-                              fontSize: 12.5, color: AppColors.textSecondary))),
-                  if (_error != null) ...[
-                    const SizedBox(height: AppSpacing.md),
-                    MessageBanner(message: _error!)
-                  ],
-                  const SizedBox(height: AppSpacing.xl),
-                  FilledButton(
-                      onPressed: _busy ? null : _submit,
-                      child: _busy
-                          ? const ButtonSpinner()
-                          : const Text('Create property')),
-                  const SizedBox(height: AppSpacing.xl),
-                ])),
-      );
-}
-
-
-class _LocationPickerSheet extends StatefulWidget {
-  const _LocationPickerSheet({required this.title, required this.items, required this.searchable});
-  final String title;
-  final List<RwandaLocation> items;
-  final bool searchable;
-  @override
-  State<_LocationPickerSheet> createState() => _LocationPickerSheetState();
-}
-
-class _LocationPickerSheetState extends State<_LocationPickerSheet> {
-  String query = '';
-  @override
-  Widget build(BuildContext context) {
-    final filtered = widget.items.where((item) => item.name.toLowerCase().contains(query.trim().toLowerCase())).toList();
-    return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.only(left: AppSpacing.md, right: AppSpacing.md, top: AppSpacing.md, bottom: MediaQuery.viewInsetsOf(context).bottom + AppSpacing.md),
-        child: SizedBox(
-          height: MediaQuery.sizeOf(context).height * .68,
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Select ${widget.title}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-            if (widget.searchable) ...[
-              const SizedBox(height: AppSpacing.md),
-              TextField(onChanged: (value) => setState(() => query = value), decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Search by name')),
-            ],
-            const SizedBox(height: AppSpacing.sm),
-            Expanded(child: filtered.isEmpty
-              ? const Center(child: Text('No matching locations found'))
-              : ListView.builder(itemCount: filtered.length, itemBuilder: (context, index) {
-                  final item = filtered[index];
-                  return ListTile(title: Text(item.name), onTap: () => Navigator.pop(context, item));
-                })),
-          ]),
-        ),
-      ),
+    final formatted = result.toString();
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+      composing: TextRange.empty,
     );
   }
 }
