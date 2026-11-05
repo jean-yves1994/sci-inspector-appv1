@@ -85,7 +85,7 @@ class ClientEstimatePage extends ConsumerWidget {
     }
 
     final notifier = ref.read(inspectionWorkspaceProvider(inspectionId).notifier);
-    final visible = section!.fields.where((f) => f.isVisible(valuesByCode)).toList();
+    final visible = section.fields.where((f) => f.isVisible(valuesByCode)).toList();
     final annexTotal = improved ? _annexTotal(valuesByCode) : 0.0;
     final landValue = improved
         ? _number(valuesByCode['IMPROVED_LAND_VALUE'])
@@ -124,11 +124,11 @@ class ClientEstimatePage extends ConsumerWidget {
           ),
         ),
         if (improved)
-          Padding(
-            padding: const EdgeInsets.only(top: AppSpacing.xs),
+          const Padding(
+            padding: EdgeInsets.only(top: AppSpacing.xs),
             child: Text(
               'Total estimated value = land value + main building value + annexes total value.',
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 11.5,
                 color: AppColors.textSecondary,
               ),
