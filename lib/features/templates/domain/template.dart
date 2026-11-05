@@ -11,7 +11,19 @@ class TemplateField {
 
   factory TemplateField.fromJson(Map<String, dynamic> j) {
     final raw = j['options']; final options = <String>[];
-    if (raw is List) for (final o in raw) { if (o is String) options.add(o); else if (o is Map<String, dynamic>) { final v = o['value'] ?? o['label'] ?? o['code']; if (v != null) options.add(v.toString()); } }
+    if (raw is List) {
+      for (final option in raw) {
+        if (option is String) {
+          options.add(option);
+        } else if (option is Map<String, dynamic>) {
+          final value =
+              option['value'] ?? option['label'] ?? option['code'];
+          if (value != null) {
+            options.add(value.toString());
+          }
+        }
+      }
+    }
     final validation = j['validation'] is Map ? Map<String, dynamic>.from(j['validation'] as Map) : null;
     return TemplateField(id: j['id'] as String, code: j['code'] as String? ?? '', label: j['label'] as String? ?? j['code'] as String? ?? 'Field', type: FieldType.parse(j['type'] as String?), required: j['required'] as bool? ?? false, sortOrder: (j['sortOrder'] as num?)?.toInt() ?? 0, options: options, helpText: j['helpText'] as String?, validation: validation);
   }
@@ -32,7 +44,10 @@ class TemplateField {
     if (rule.containsKey('equals')) {
       final expected = rule['equals'];
       if (actual is List) { if (!actual.map((e) => e.toString()).contains(expected.toString())) return false; }
-      else if (actual?.toString().toUpperCase() != expected?.toString().toUpperCase()) return false;
+      else if (actual?.toString().toUpperCase() !=
+          expected?.toString().toUpperCase()) {
+        return false;
+      }
     }
     if (rule['min'] != null && (actual is! num || actual < (rule['min'] as num))) return false;
     if (rule['max'] != null && (actual is! num || actual > (rule['max'] as num))) return false;
