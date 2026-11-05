@@ -159,11 +159,15 @@ class _InspectionWorkspaceScreenState extends ConsumerState<InspectionWorkspaceS
     final propertyStatus = propertyStatusField == null
         ? null
         : valuesById[propertyStatusField.id]?.valueText?.trim().toUpperCase();
-    final isVacantLand = const <String>{
-      'VACANT_PLOT',
-      'LAND',
-      'VACANT LAND',
-    }.contains(propertyStatus);
+    final propertyType = inspection.propertyType?.trim().toUpperCase();
+    final isLandProperty = propertyType == 'LAND' ||
+        const <String>{'VACANT_PLOT', 'LAND', 'VACANT LAND'}
+            .contains(propertyStatus);
+    final propertyUseField = fieldsByCode['PROPERTY_USE'];
+    final propertyUse = propertyUseField == null
+        ? null
+        : valuesById[propertyUseField.id]?.valueText?.trim().toUpperCase();
+    final isResidential = propertyUse == 'RESIDENTIAL';
 
     _Step makeStep(TemplateSection section) {
       final title = switch (section.code) {
@@ -201,15 +205,21 @@ class _InspectionWorkspaceScreenState extends ConsumerState<InspectionWorkspaceS
       final isBuildingSection = section.code == 'MAIN_BUILDING';
       final isImprovedValuation = section.code == 'IMPROVED_VALUATION';
 
-      // Land-only inspections do not include building, annex, or improved
-      // valuation tabs. Their land description and land valuation remain visible.
-      if (isVacantLand &&
+      // Property type (captured when the property is registered) determines
+      // land versus building navigation. PROPERTY_STATUS remains a fallback
+      // for older properties created before propertyType was returned.
+      if (isLandProperty &&
           (isBuildingSection ||
               isAdditionalBuildings ||
               isAnnex ||
               isImprovedValuation)) {
         continue;
       }
+
+      // Land valuation is only relevant to land-only properties. Residential
+      // building use does not need the vacant-land description section.
+      if (!isLandProperty && section.code == 'LAND_VALUATION') continue;
+      if (isResidential && section.code == 'VACANT_LAND') continue;
 
       // The individual Annex sections replace the old generic "Annexes"
       // section in the top navigation.
@@ -235,7 +245,7 @@ class _InspectionWorkspaceScreenState extends ConsumerState<InspectionWorkspaceS
 
     // If a template places Annex sections without a Main Building section,
     // don't lose them from navigation.
-    if (!buildingGroupInserted && !isVacantLand) {
+    if (!buildingGroupInserted && !isLandProperty) {
       for (final section in sections) {
         if (!section.code.startsWith('ANNEX_')) continue;
         final number = int.tryParse(section.code.substring('ANNEX_'.length));
