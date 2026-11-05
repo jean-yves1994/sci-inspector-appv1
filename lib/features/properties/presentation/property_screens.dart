@@ -43,8 +43,9 @@ class _PropertyListScreenState extends ConsumerState<PropertyListScreen> {
   }
 
   void _onScroll() {
-    if (_scroll.position.pixels >= _scroll.position.maxScrollExtent - 400)
+    if (_scroll.position.pixels >= _scroll.position.maxScrollExtent - 400) {
       ref.read(propertyListProvider.notifier).loadMore();
+    }
   }
 
   @override
@@ -115,7 +116,7 @@ class _PropertyListScreenState extends ConsumerState<PropertyListScreen> {
                   separatorBuilder: (_, __) =>
                   const SizedBox(height: AppSpacing.sm),
                   itemBuilder: (context, i) {
-                    if (i == state.items.length)
+                    if (i == state.items.length) {
                       return state.isLoadingMore
                           ? const Padding(
                           padding: EdgeInsets.all(AppSpacing.lg),
@@ -123,6 +124,7 @@ class _PropertyListScreenState extends ConsumerState<PropertyListScreen> {
                               child: CircularProgressIndicator(
                                   strokeWidth: 2)))
                           : const SizedBox.shrink();
+                    }
                     return _PropertyCard(property: state.items[i]);
                   },
                 ),
@@ -914,38 +916,3 @@ class _LocationPickerSheetState extends State<_LocationPickerSheet> {
   }
 }
 
-
-/// Formats a Rwanda UPI as 1/02/09/04/1234 while the user types.
-/// Existing separators are removed before rebuilding the formatted value.
-class _UpiInputFormatter extends TextInputFormatter {
-  static const List<int> _segmentLengths = [1, 2, 2, 2, 9];
-
-  @override
-  TextEditingValue formatEditUpdate(
-      TextEditingValue oldValue,
-      TextEditingValue newValue,
-      ) {
-    final digits = newValue.text.replaceAll(RegExp(r'[^0-16]'), '');
-    final limitedDigits =
-    digits.length > 16 ? digits.substring(0, 16) : digits;
-
-    final result = StringBuffer();
-    var offset = 0;
-
-    for (final segmentLength in _segmentLengths) {
-      if (offset >= limitedDigits.length) break;
-
-      if (result.isNotEmpty) result.write('/');
-      final end = (offset + segmentLength).clamp(0, limitedDigits.length);
-      result.write(limitedDigits.substring(offset, end));
-      offset = end;
-    }
-
-    final formatted = result.toString();
-    return TextEditingValue(
-      text: formatted,
-      selection: TextSelection.collapsed(offset: formatted.length),
-      composing: TextRange.empty,
-    );
-  }
-}
