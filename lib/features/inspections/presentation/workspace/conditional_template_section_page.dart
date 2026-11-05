@@ -81,7 +81,6 @@ class ConditionalTemplateSectionPage extends ConsumerWidget {
             )
             .toList()
         : <TemplateField>[];
-        .toList();
 
     final notifier =
         ref.read(inspectionWorkspaceProvider(inspectionId).notifier);
