@@ -128,7 +128,7 @@ class ClientEstimatePage extends ConsumerWidget {
             padding: EdgeInsets.only(top: AppSpacing.xs),
             child: Text(
               'Total estimated value = land value + main building value + annexes total value.',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 11.5,
                 color: AppColors.textSecondary,
               ),
