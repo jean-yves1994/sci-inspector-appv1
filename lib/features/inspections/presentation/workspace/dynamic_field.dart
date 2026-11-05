@@ -134,7 +134,9 @@ class _DynamicInspectionFieldState extends State<DynamicInspectionField> {
   Widget _control(BuildContext context) {
     // Annex count is a bounded choice, not free-form numeric input.
     if (widget.field.code == 'ANNEX_COUNT') {
-      final current = widget.value?.valueNumber?.round();
+      final savedValue = widget.value;
+      final current = savedValue?.valueNumber?.round() ??
+          double.tryParse(savedValue?.valueText?.trim() ?? '')?.round();
       return DropdownButtonFormField<int>(
         initialValue: current != null && current >= 0 && current <= 4
             ? current
