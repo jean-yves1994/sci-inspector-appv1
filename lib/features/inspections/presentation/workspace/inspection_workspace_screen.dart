@@ -8,7 +8,6 @@ import '../../../templates/domain/template.dart';
 import '../../application/inspection_providers.dart';
 import '../../domain/inspection.dart';
 import '../../domain/inspection_status.dart';
-import 'client_estimate_page.dart';
 import 'conditional_template_section_page.dart';
 import 'section_pages.dart';
 import 'save_status_bar.dart';
@@ -104,7 +103,7 @@ class _InspectionWorkspaceScreenState extends ConsumerState<InspectionWorkspaceS
                   ),
                   child: Row(
                     children: <Widget>[
-                      Icon(Icons.person_outline_rounded, size: 20, color: AppColors.primary),
+                      const Icon(Icons.person_outline_rounded, size: 20, color: AppColors.primary),
                       const SizedBox(width: AppSpacing.sm),
                       Expanded(
                         child: Column(
@@ -116,7 +115,7 @@ class _InspectionWorkspaceScreenState extends ConsumerState<InspectionWorkspaceS
                           ],
                         ),
                       ),
-                      Icon(Icons.lock_outline_rounded, size: 16, color: AppColors.textSecondary),
+                      const Icon(Icons.lock_outline_rounded, size: 16, color: AppColors.textSecondary),
                     ],
                   ),
                 ),
