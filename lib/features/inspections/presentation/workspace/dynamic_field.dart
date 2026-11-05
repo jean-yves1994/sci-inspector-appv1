@@ -132,6 +132,26 @@ class _DynamicInspectionFieldState extends State<DynamicInspectionField> {
   }
 
   Widget _control(BuildContext context) {
+    // Annex count is a bounded choice, not free-form numeric input.
+    if (widget.field.code == 'ANNEX_COUNT') {
+      final current = widget.value?.valueNumber?.round();
+      return DropdownButtonFormField<int>(
+        initialValue: current != null && current >= 0 && current <= 4
+            ? current
+            : null,
+        isExpanded: true,
+        decoration: const InputDecoration(hintText: 'Select number of annexes'),
+        items: <DropdownMenuItem<int>>[
+          for (var count = 0; count <= 4; count++)
+            DropdownMenuItem<int>(
+              value: count,
+              child: Text(count == 0 ? '0 — No annexes' : '$count'),
+            ),
+        ],
+        onChanged: _fieldEnabled ? (value) { if (value != null) _emit(value); } : null,
+      );
+    }
+
     switch (widget.field.type) {
       case FieldType.textarea:
         return TextFormField(
