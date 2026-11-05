@@ -408,6 +408,7 @@ class Inspection {
     this.propertyId,
     this.propertyReference,
     this.propertyName,
+    this.propertyType,
     this.templateId,
     this.dueDate,
     this.submittedAt,
@@ -437,6 +438,7 @@ class Inspection {
   final String? propertyId;
   final String? propertyReference;
   final String? propertyName;
+  final String? propertyType;
   final String? templateId;
   final DateTime? dueDate;
   final DateTime? submittedAt;
@@ -481,6 +483,7 @@ class Inspection {
         propertyId: propertyId,
         propertyReference: propertyReference,
         propertyName: propertyName,
+        propertyType: propertyType,
         templateId: templateId,
         dueDate: dueDate,
         submittedAt: submittedAt,
@@ -518,6 +521,7 @@ class Inspection {
           J.asString(j['propertyId']) ?? J.asString(property?['id']),
       propertyReference: J.asString(property?['reference']),
       propertyName: J.asString(property?['name']),
+      propertyType: J.asString(property?['propertyType']),
       templateId: J.asString(j['templateId']),
       dueDate: J.asDate(j['dueDate']),
       submittedAt: J.asDate(j['submittedAt']),
