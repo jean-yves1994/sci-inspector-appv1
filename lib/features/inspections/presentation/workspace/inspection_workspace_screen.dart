@@ -149,7 +149,13 @@ class _InspectionWorkspaceScreenState extends ConsumerState<InspectionWorkspaceS
     final annexCountField = fieldsByCode['ANNEX_COUNT'];
     final annexCountValue =
         annexCountField == null ? null : valuesById[annexCountField.id];
-    final annexCount = annexCountValue?.valueNumber?.round() ?? 0;
+    // Numeric fields are stored in valueNumber. Also accept legacy SELECT/text
+    // values so existing inspections retain their selected annex navigation.
+    final annexCount = (annexCountValue?.valueNumber ??
+            double.tryParse(annexCountValue?.valueText?.trim() ?? ''))
+        ?.round()
+        .clamp(0, 4) ??
+        0;
 
     // PROPERTY_STATUS is stored as VACANT_PLOT for land-only inspections and
     // IMPROVED when the property has a building. Match the backend template's
