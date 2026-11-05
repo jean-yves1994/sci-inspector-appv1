@@ -54,12 +54,33 @@ class ConditionalTemplateSectionPage extends ConsumerWidget {
       }
     }
 
-    final visible = section.fields
-        .where(
-          (field) =>
-              field.isVisible(valuesByCode) &&
-              !_isRetiredInsideWindowField(field.code),
-        )
+    final propertyType = inspection?.propertyType?.trim().toUpperCase();
+    final propertyStatus = valuesByCode['PROPERTY_STATUS']?.toString().toUpperCase();
+    final propertyUse = valuesByCode['PROPERTY_USE']?.toString().toUpperCase();
+    final isLandProperty = propertyType == 'LAND' ||
+        const <String>{'VACANT_PLOT', 'LAND', 'VACANT LAND'}
+            .contains(propertyStatus);
+    final isResidential = propertyUse == 'RESIDENTIAL';
+
+    final sectionApplies = !(isLandProperty &&
+            const <String>{
+              'MAIN_BUILDING',
+              'ADDITIONAL_BUILDINGS',
+              'IMPROVED_VALUATION',
+            }.contains(section.code)) &&
+        !(isLandProperty && section.code.startsWith('ANNEX_')) &&
+        !(!isLandProperty && section.code == 'LAND_VALUATION') &&
+        !(isResidential && section.code == 'VACANT_LAND');
+
+    final visible = sectionApplies
+        ? section.fields
+            .where(
+              (field) =>
+                  field.isVisible(valuesByCode) &&
+                  !_isRetiredInsideWindowField(field.code),
+            )
+            .toList()
+        : <TemplateField>[];
         .toList();
 
     final notifier =
