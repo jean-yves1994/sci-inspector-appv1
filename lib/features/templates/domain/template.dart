@@ -2,7 +2,7 @@
 enum FieldType {
   text('TEXT'), textarea('TEXTAREA'), number('NUMBER'), currency('CURRENCY'), date('DATE'), select('SELECT'), multiSelect('MULTI_SELECT'), boolean('BOOLEAN'), phone('PHONE'), email('EMAIL'), nationalId('NATIONAL_ID'), unknown('UNKNOWN');
   const FieldType(this.wire); final String wire;
-  static FieldType parse(String? v) { if (v == null) return FieldType.unknown; for (final t in FieldType.values) { if (t.wire == v.toUpperCase()) return t; } return FieldType.unknown; }
+  static FieldType parse(String? v) { if (v == null) { return FieldType.unknown; } for (final t in FieldType.values) { if (t.wire == v.toUpperCase()) return t; } return FieldType.unknown; }
 }
 
 class TemplateField {
@@ -24,7 +24,7 @@ class TemplateField {
   bool get isReadOnly => validation?['readOnly'] == true || isComputed;
 
   static bool _matchesVisibility(dynamic rule, Map<String, dynamic> values) {
-    if (rule is! Map) return true;
+    if (rule is! Map) { return true; }
     final all = rule['all']; if (all is List && !all.every((r) => _matchesVisibility(r, values))) return false;
     final any = rule['any']; if (any is List && any.isNotEmpty && !any.any((r) => _matchesVisibility(r, values))) return false;
     final field = rule['field']?.toString(); if (field == null || field.isEmpty) return true;
