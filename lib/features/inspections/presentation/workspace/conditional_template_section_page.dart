@@ -75,11 +75,21 @@ class ConditionalTemplateSectionPage extends ConsumerWidget {
         !(!isLandProperty && section.code == 'LAND_VALUATION') &&
         !(isResidential && section.code == 'VACANT_LAND');
 
+    final rawAnnexCount = valuesByCode['ANNEX_COUNT'];
+    final annexCount = (rawAnnexCount is num
+            ? rawAnnexCount
+            : num.tryParse(rawAnnexCount?.toString().trim() ?? '')) ??
+        0;
+    final hasAnnexes = annexCount > 0;
+
     final visible = sectionApplies
         ? section.fields
             .where(
               (field) =>
                   field.code != 'ANNEX_COUNT' &&
+                  // Annex valuation is relevant only when at least one annex
+                  // has been selected on the Main Building tab.
+                  (field.code != 'ANNEX_TOTAL_VALUE' || hasAnnexes) &&
                   field.isVisible(valuesByCode) &&
                   !_isRetiredInsideWindowField(field.code),
             )
