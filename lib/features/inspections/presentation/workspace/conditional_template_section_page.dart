@@ -18,14 +18,14 @@ class ConditionalTemplateSectionPage extends ConsumerWidget {
     required this.inspectionId,
     required this.section,
     required this.enabled,
-    this.showAnnexCountSelector = false,
+    this.annexCountField,
     super.key,
   });
 
   final String inspectionId;
   final TemplateSection section;
   final bool enabled;
-  final bool showAnnexCountSelector;
+  final TemplateField? annexCountField;
 
   Object? _raw(InspectionValue? value) {
     if (value == null) return null;
@@ -88,19 +88,7 @@ class ConditionalTemplateSectionPage extends ConsumerWidget {
     final notifier =
         ref.read(inspectionWorkspaceProvider(inspectionId).notifier);
 
-    TemplateField? annexCountField;
-    if (showAnnexCountSelector) {
-      for (final templateSection
-          in inspection?.template?.sections ?? const <TemplateSection>[]) {
-        for (final field in templateSection.fields) {
-          if (field.code == 'ANNEX_COUNT') {
-            annexCountField = field;
-            break;
-          }
-        }
-        if (annexCountField != null) break;
-      }
-    }
+
 
     return ListView(
       padding: const EdgeInsets.all(AppSpacing.md),
