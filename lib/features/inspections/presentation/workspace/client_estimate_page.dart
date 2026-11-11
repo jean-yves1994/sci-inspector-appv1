@@ -70,6 +70,7 @@ class ClientEstimatePage extends ConsumerWidget {
       }
     }
 
+    final annexCount = _number(valuesByCode['ANNEX_COUNT']).round().clamp(0, 4);
     final status = valuesByCode['PROPERTY_STATUS']?.toString().toUpperCase();
     final improved = status == 'PROPERTY_WITH_IMPROVEMENT' || status == 'IMPROVED';
     final sectionCode = improved ? 'IMPROVED_VALUATION' : 'LAND_VALUATION';
@@ -85,8 +86,13 @@ class ClientEstimatePage extends ConsumerWidget {
     }
 
     final notifier = ref.read(inspectionWorkspaceProvider(inspectionId).notifier);
-    final visible = section.fields.where((f) => f.isVisible(valuesByCode)).toList();
-    final annexTotal = improved ? _annexTotal(valuesByCode) : 0.0;
+    final visible = section.fields.where((f) =>
+      f.isVisible(valuesByCode) &&
+      (f.code != 'ANNEX_TOTAL_VALUE' || annexCount > 0)
+    ).toList();
+    final annexTotal = improved && annexCount > 0
+        ? _number(valuesByCode['ANNEX_TOTAL_VALUE'])
+        : 0.0;
     final landValue = improved
         ? _number(valuesByCode['IMPROVED_LAND_VALUE'])
         : _number(valuesByCode['LAND_ESTIMATED_VALUE']);
@@ -105,9 +111,7 @@ class ClientEstimatePage extends ConsumerWidget {
             child: Column(
               children: <Widget>[
                 for (final field in visible)
-                  if (field.code == 'ANNEX_TOTAL_VALUE')
-                    _calculatedField(label: field.label, value: annexTotal)
-                  else if (field.code == 'IMPROVED_TOTAL_VALUE')
+                  if (field.code == 'IMPROVED_TOTAL_VALUE')
                     _calculatedField(label: field.label, value: totalEstimatedValue)
                   else
                     DynamicInspectionField(
