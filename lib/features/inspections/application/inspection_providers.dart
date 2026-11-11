@@ -454,15 +454,14 @@ class InspectionWorkspaceNotifier
 
     final land = _numberForCode('IMPROVED_LAND_VALUE', fieldsByCode, values);
     final main = _numberForCode('MAIN_BUILDING_VALUE', fieldsByCode, values);
-    final annexValues = <double?>[
-      for (var i = 1; i <= 4; i++)
-        _numberForCode('ANNEX_${i}_VALUE', fieldsByCode, values),
-    ];
+    final annexCount = (_numberForCode('ANNEX_COUNT', fieldsByCode, values) ?? 0)
+        .round()
+        .clamp(0, 4);
+    final enteredAnnexTotal =
+        _numberForCode('ANNEX_TOTAL_VALUE', fieldsByCode, values);
+    final annexTotal = annexCount > 0 ? enteredAnnexTotal : 0.0;
     final hasAnyValuation = land != null || main != null ||
-        annexValues.any((value) => value != null);
-    final annexTotal = hasAnyValuation
-        ? annexValues.fold<double>(0, (sum, value) => sum + (value ?? 0))
-        : null;
+        (annexCount > 0 && enteredAnnexTotal != null);
     final total = hasAnyValuation
         ? (land ?? 0) + (main ?? 0) + (annexTotal ?? 0)
         : null;
@@ -480,7 +479,6 @@ class InspectionWorkspaceNotifier
       }
     }
 
-    setComputed('ANNEX_TOTAL_VALUE', annexTotal);
     setComputed('IMPROVED_TOTAL_VALUE', total);
   }
 
