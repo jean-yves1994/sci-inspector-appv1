@@ -94,23 +94,6 @@ class ConditionalTemplateSectionPage extends ConsumerWidget {
       padding: const EdgeInsets.all(AppSpacing.md),
       children: <Widget>[
         SectionLabel(section.name),
-        if (annexField != null) ...<Widget>[
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              child: DynamicInspectionField(
-                field: annexField,
-                value: notifier.valueFor(annexField.id),
-                enabled: enabled,
-                onChanged: (value) => notifier.onFieldChanged(
-                  value,
-                  sectionCode: section.code,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-        ],
         if (visible.isEmpty && annexField == null)
           const Card(
             child: Padding(
@@ -124,7 +107,7 @@ class ConditionalTemplateSectionPage extends ConsumerWidget {
               ),
             ),
           )
-        else if (visible.isNotEmpty)
+        else if (visible.isNotEmpty || annexField != null)
           Card(
             child: Padding(
               padding: const EdgeInsets.all(AppSpacing.md),
@@ -140,6 +123,18 @@ class ConditionalTemplateSectionPage extends ConsumerWidget {
                         sectionCode: section.code,
                       ),
                     ),
+                  if (annexField != null) ...<Widget>[
+                    const Divider(height: AppSpacing.lg),
+                    DynamicInspectionField(
+                      field: annexField,
+                      value: notifier.valueFor(annexField.id),
+                      enabled: enabled,
+                      onChanged: (value) => notifier.onFieldChanged(
+                        value,
+                        sectionCode: section.code,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
