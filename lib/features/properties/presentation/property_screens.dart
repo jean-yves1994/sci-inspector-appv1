@@ -706,8 +706,7 @@ class _CreatePropertyScreenState extends ConsumerState<CreatePropertyScreen> {
                 return 'UPI is required';
               }
 
-              if (!RegExp(r'^\d/\d{2}/\d{2}/\d{2}/\d+
-                  .hasMatch(upi)) {
+              if (!RegExp(r'^\d/\d{2}/\d{2}/\d{2}/\d+$').hasMatch(upi)) {
                 return 'Enter a valid UPI, e.g. 1/02/04/01/875 or 1/02/04/01/1234';
               }
 
