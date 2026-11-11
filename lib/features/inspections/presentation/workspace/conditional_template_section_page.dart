@@ -38,8 +38,9 @@ class ConditionalTemplateSectionPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final inspection =
-        ref.watch(inspectionWorkspaceProvider(inspectionId)).valueOrNull?.inspection;
+    final workspace = ref.watch(inspectionWorkspaceProvider(inspectionId)).valueOrNull;
+    final inspection = workspace?.inspection;
+    final activeTemplate = workspace?.template ?? inspection?.template;
     final valuesById = <String, InspectionValue>{
       for (final value in inspection?.values ?? const <InspectionValue>[])
         value.fieldId: value,
@@ -47,7 +48,7 @@ class ConditionalTemplateSectionPage extends ConsumerWidget {
     final valuesByCode = <String, dynamic>{};
 
     for (final templateSection
-        in inspection?.template?.sections ?? const <TemplateSection>[]) {
+        in activeTemplate?.sections ?? const <TemplateSection>[]) {
       for (final field in templateSection.fields) {
         final value = valuesById[field.id];
         if (value != null) {
