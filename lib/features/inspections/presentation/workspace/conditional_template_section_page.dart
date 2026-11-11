@@ -88,6 +88,7 @@ class ConditionalTemplateSectionPage extends ConsumerWidget {
 
     final notifier =
         ref.read(inspectionWorkspaceProvider(inspectionId).notifier);
+    final annexField = annexCountField;
 
 
 
