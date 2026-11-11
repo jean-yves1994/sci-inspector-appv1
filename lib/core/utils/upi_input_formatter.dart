@@ -1,44 +1,59 @@
 import 'package:flutter/services.dart';
 
+/// Formats Rwanda UPI values as 1/02/04/01/<variable final segment>.
+///
+/// The first four groups have fixed lengths (1, 2, 2, 2). The final group is
+/// variable-length; there is no fixed total digit count.
 class UpiInputFormatter extends TextInputFormatter {
-  static const List<int> _segmentLengths = [1, 2, 2, 2, 9];
+  static const List<int> _prefixSegmentLengths = <int>[1, 2, 2, 2];
 
   @override
   TextEditingValue formatEditUpdate(
-      TextEditingValue oldValue,
-      TextEditingValue newValue,
-      ) {
-    // Keep all digits from 0 to 9.
-    final digits = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final input = newValue.text;
+    final digits = input.replaceAll(RegExp(r'[^0-9]'), '');
+    final selectionOffset =
+        newValue.selection.extentOffset.clamp(0, input.length);
+    final digitsBeforeCursor = input
+        .substring(0, selectionOffset)
+        .replaceAll(RegExp(r'[^0-9]'), '')
+        .length;
 
-    // Rwanda UPI contains 16 digits in total.
-    final limitedDigits =
-    digits.length > 16 ? digits.substring(0, 16) : digits;
-
-    final result = StringBuffer();
-    var offset = 0;
-
-    for (final segmentLength in _segmentLengths) {
-      if (offset >= limitedDigits.length) break;
-
-      if (result.isNotEmpty) {
-        result.write('/');
-      }
-
-      final end = (offset + segmentLength)
-          .clamp(0, limitedDigits.length);
-
-      result.write(limitedDigits.substring(offset, end));
-      offset = end;
+    final formatted = StringBuffer();
+    var digitOffset = 0;
+    for (final segmentLength in _prefixSegmentLengths) {
+      if (digitOffset >= digits.length) break;
+      if (formatted.isNotEmpty) formatted.write('/');
+      final end = (digitOffset + segmentLength).clamp(0, digits.length);
+      formatted.write(digits.substring(digitOffset, end));
+      digitOffset = end;
     }
 
-    final formatted = result.toString();
+    // All digits after the first seven belong to the variable final segment.
+    if (digitOffset < digits.length) {
+      if (formatted.isNotEmpty) formatted.write('/');
+      formatted.write(digits.substring(digitOffset));
+    }
+
+    final text = formatted.toString();
+    var cursor = 0;
+    var seenDigits = 0;
+    while (cursor < text.length && seenDigits < digitsBeforeCursor) {
+      if (RegExp(r'[0-9]').hasMatch(text[cursor])) seenDigits++;
+      cursor++;
+    }
+    if (seenDigits == digitsBeforeCursor &&
+        cursor < text.length &&
+        text[cursor] == '/' &&
+        digitsBeforeCursor > 0) {
+      cursor++;
+    }
 
     return TextEditingValue(
-      text: formatted,
-      selection: TextSelection.collapsed(
-        offset: formatted.length,
-      ),
+      text: text,
+      selection: TextSelection.collapsed(offset: cursor.clamp(0, text.length)),
       composing: TextRange.empty,
     );
   }
