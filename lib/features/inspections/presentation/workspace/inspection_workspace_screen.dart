@@ -197,6 +197,7 @@ class _InspectionWorkspaceScreenState extends ConsumerState<InspectionWorkspaceS
           inspectionId: id,
           section: section,
           enabled: enabled,
+          showAnnexCountSelector: section.code == 'MAIN_BUILDING',
         ),
       );
     }
