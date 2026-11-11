@@ -18,12 +18,14 @@ class ConditionalTemplateSectionPage extends ConsumerWidget {
     required this.inspectionId,
     required this.section,
     required this.enabled,
+    this.showAnnexCountSelector = false,
     super.key,
   });
 
   final String inspectionId;
   final TemplateSection section;
   final bool enabled;
+  final bool showAnnexCountSelector;
 
   Object? _raw(InspectionValue? value) {
     if (value == null) return null;
@@ -76,6 +78,7 @@ class ConditionalTemplateSectionPage extends ConsumerWidget {
         ? section.fields
             .where(
               (field) =>
+                  field.code != 'ANNEX_COUNT' &&
                   field.isVisible(valuesByCode) &&
                   !_isRetiredInsideWindowField(field.code),
             )
@@ -85,11 +88,37 @@ class ConditionalTemplateSectionPage extends ConsumerWidget {
     final notifier =
         ref.read(inspectionWorkspaceProvider(inspectionId).notifier);
 
+    TemplateField? annexCountField;
+    if (showAnnexCountSelector) {
+      for (final templateSection
+          in inspection?.template?.sections ?? const <TemplateSection>[]) {
+        for (final field in templateSection.fields) {
+          if (field.code == 'ANNEX_COUNT') {
+            annexCountField = field;
+            break;
+          }
+        }
+        if (annexCountField != null) break;
+      }
+    }
+
     return ListView(
       padding: const EdgeInsets.all(AppSpacing.md),
       children: <Widget>[
         SectionLabel(section.name),
-        if (visible.isEmpty)
+        if (annexCountField != null) ...<Widget>[
+          DynamicInspectionField(
+            field: annexCountField,
+            value: notifier.valueFor(annexCountField.id),
+            enabled: enabled,
+            onChanged: (value) => notifier.onFieldChanged(
+              value,
+              sectionCode: section.code,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+        ],
+        if (visible.isEmpty && annexCountField == null)
           const Card(
             child: Padding(
               padding: EdgeInsets.all(AppSpacing.lg),
@@ -102,7 +131,7 @@ class ConditionalTemplateSectionPage extends ConsumerWidget {
               ),
             ),
           )
-        else
+        else if (visible.isNotEmpty)
           Card(
             child: Padding(
               padding: const EdgeInsets.all(AppSpacing.md),
