@@ -369,7 +369,7 @@ class _Counters extends ConsumerWidget {
           crossAxisSpacing: AppSpacing.sm,
           // Raised from 1.5: the tiles were taller than their content needed,
           // which is what created the empty band beneath the grid.
-          childAspectRatio: 1.75,
+          childAspectRatio: 1.3,
           children: <Widget>[
             StatCard(
               label: 'Assigned',
