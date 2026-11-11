@@ -28,14 +28,6 @@ class ClientEstimatePage extends ConsumerWidget {
     return double.tryParse(value?.toString() ?? '') ?? 0;
   }
 
-  double _annexTotal(Map<String, dynamic> valuesByCode) {
-    var total = 0.0;
-    for (var i = 1; i <= 4; i++) {
-      total += _number(valuesByCode['ANNEX_${i}_VALUE']);
-    }
-    return total;
-  }
-
   Widget _calculatedField({required String label, required double value}) {
     final formatted = NumberFormat('#,##0.00', 'en_US').format(value);
     return Padding(
