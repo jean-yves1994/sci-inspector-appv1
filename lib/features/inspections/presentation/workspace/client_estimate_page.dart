@@ -49,8 +49,9 @@ class ClientEstimatePage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final inspection = ref.watch(inspectionWorkspaceProvider(inspectionId)).valueOrNull?.inspection;
-    final template = inspection?.template;
+    final workspace = ref.watch(inspectionWorkspaceProvider(inspectionId)).valueOrNull;
+    final inspection = workspace?.inspection;
+    final template = workspace?.template ?? inspection?.template;
     final valuesById = <String, InspectionValue>{
       for (final v in inspection?.values ?? const <InspectionValue>[]) v.fieldId: v,
     };
