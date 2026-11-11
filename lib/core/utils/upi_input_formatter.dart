@@ -15,7 +15,7 @@ class UpiInputFormatter extends TextInputFormatter {
     final input = newValue.text;
     final digits = input.replaceAll(RegExp(r'[^0-9]'), '');
     final selectionOffset =
-        newValue.selection.extentOffset.clamp(0, input.length);
+        newValue.selection.extentOffset.clamp(0, input.length).toInt();
     final digitsBeforeCursor = input
         .substring(0, selectionOffset)
         .replaceAll(RegExp(r'[^0-9]'), '')
@@ -26,7 +26,7 @@ class UpiInputFormatter extends TextInputFormatter {
     for (final segmentLength in _prefixSegmentLengths) {
       if (digitOffset >= digits.length) break;
       if (formatted.isNotEmpty) formatted.write('/');
-      final end = (digitOffset + segmentLength).clamp(0, digits.length);
+      final end = (digitOffset + segmentLength).clamp(0, digits.length).toInt();
       formatted.write(digits.substring(digitOffset, end));
       digitOffset = end;
     }
@@ -53,7 +53,7 @@ class UpiInputFormatter extends TextInputFormatter {
 
     return TextEditingValue(
       text: text,
-      selection: TextSelection.collapsed(offset: cursor.clamp(0, text.length)),
+      selection: TextSelection.collapsed(offset: cursor.clamp(0, text.length).toInt()),
       composing: TextRange.empty,
     );
   }
