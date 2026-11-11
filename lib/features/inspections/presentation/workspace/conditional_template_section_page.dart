@@ -90,20 +90,23 @@ class ConditionalTemplateSectionPage extends ConsumerWidget {
         ref.read(inspectionWorkspaceProvider(inspectionId).notifier);
     final annexField = annexCountField;
 
-
-
     return ListView(
       padding: const EdgeInsets.all(AppSpacing.md),
       children: <Widget>[
         SectionLabel(section.name),
         if (annexField != null) ...<Widget>[
-          DynamicInspectionField(
-            field: annexField,
-            value: notifier.valueFor(annexField.id),
-            enabled: enabled,
-            onChanged: (value) => notifier.onFieldChanged(
-              value,
-              sectionCode: section.code,
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: DynamicInspectionField(
+                field: annexField,
+                value: notifier.valueFor(annexField.id),
+                enabled: enabled,
+                onChanged: (value) => notifier.onFieldChanged(
+                  value,
+                  sectionCode: section.code,
+                ),
+              ),
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
